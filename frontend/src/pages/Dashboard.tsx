@@ -13,21 +13,55 @@ export const Dashboard: React.FC = () => {
   const [running,  setRunning]  = useState(false);
   const [selected, setSelected] = useState<TelemetryEvent | null>(null);
   const [tab,      setTab]      = useState<'timeline' | 'chart'>('timeline');
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'live' | 'demo'>('connecting');
 
   const stats = generateStats(events);
 
-  // Live simulation — add a new event every 12 s
+  // ── WebSocket live stream from backend ──────────────────────────────────
   useEffect(() => {
-    const timer = setInterval(() => {
-      setEvents(prev => {
-        const [newEv] = generateEvents(1);
-        return [newEv, ...prev].slice(0, 200);
-      });
-    }, 12_000);
-    return () => clearInterval(timer);
-  }, []);
+    let ws: WebSocket | null = null;
+    let reconnect: ReturnType<typeof setTimeout> | null = null;
 
+    function connect() {
+      try {
+        ws = new WebSocket('ws://localhost:8000/ws/telemetry');
+        ws.onopen  = () => setWsStatus('live');
+        ws.onmessage = (msg) => {
+          try {
+            const ev = JSON.parse(msg.data) as TelemetryEvent;
+            setEvents(prev => [ev, ...prev].slice(0, 200));
+          } catch { /* ignore */ }
+        };
+        ws.onerror = () => { setWsStatus('demo'); };
+        ws.onclose = () => {
+          setWsStatus('demo');
+          reconnect = setTimeout(connect, 8_000);
+        };
+      } catch {
+        setWsStatus('demo');
+      }
+    }
+
+    connect();
+
+    // Fallback: add a mock event every 12 s when backend WS unavailable
+    const mockTimer = setInterval(() => {
+      if (wsStatus !== 'live') {
+        const [ev] = generateEvents(1);
+        setEvents(prev => [ev, ...prev].slice(0, 200));
+      }
+    }, 12_000);
+
+    return () => {
+      ws?.close();
+      if (reconnect) clearTimeout(reconnect);
+      clearInterval(mockTimer);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Manual detection cycle ───────────────────────────────────────────────
   const runCycle = useCallback(async () => {
+    if (running) return;
     setRunning(true);
     try {
       const { events: newEvts } = await fetchRunCycle();
@@ -35,50 +69,63 @@ export const Dashboard: React.FC = () => {
     } finally {
       setRunning(false);
     }
-  }, []);
+  }, [running]);
 
   const criticalEvents = events.filter(e => e.severity === 'critical');
+  const wsColor = wsStatus === 'live' ? 'var(--teal)' : wsStatus === 'demo' ? 'var(--medium)' : 'var(--text-muted)';
+  const wsLabel = wsStatus === 'live' ? 'LIVE BACKEND' : wsStatus === 'demo' ? 'DEMO MODE' : 'CONNECTING...';
 
   return (
     <div className="main-content">
 
-      {/* ── KPI Row ────────────────────────────────────────────────── */}
-      <div className="grid-4">
-        <StatCard label="Total Events"      value={stats.total_events}     sub="All sources"       icon="📋" animDelay={0}   />
-        <StatCard label="Critical Alerts"   value={stats.critical_alerts}  sub="Requires action"   icon="🔴" color="var(--critical)" animDelay={80}  />
-        <StatCard label="Active AI Agents"  value={stats.active_agents}    sub="Monitoring now"    icon="🤖" color="var(--teal)"     animDelay={160} />
-        <StatCard label="Threats Resolved"  value={stats.threats_resolved} sub="Last 24 hours"     icon="✅" color="var(--low)"      animDelay={240} />
-      </div>
-
-      {/* ── Risk + Stats Row ───────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '1rem', alignItems: 'stretch' }}>
-
-        {/* Risk Gauge */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '1.5rem' }}>
-          <RiskMeter score={stats.avg_risk_score} size={140} />
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Avg Risk Score</span>
-          <button className="btn btn--ghost" style={{ fontSize: '0.75rem', padding: '5px 12px' }} onClick={runCycle} disabled={running}>
-            {running ? '⟳ Scanning…' : '▶ Run Cycle'}
+      {/* ── Status Banner ──────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+            Security Operations Center
+          </h1>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
+            Real-time threat monitoring &bull; FinSpark&apos;26 Banking Demo
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: wsColor, boxShadow: `0 0 6px ${wsColor}` }} />
+          <span style={{ fontSize: '0.72rem', color: wsColor, fontWeight: 600 }}>{wsLabel}</span>
+          <button
+            className="btn btn--primary"
+            onClick={runCycle}
+            disabled={running}
+            style={{ fontSize: '0.78rem', padding: '6px 14px' }}
+          >
+            {running ? '⟳ Running...' : '▶ Run Cycle'}
           </button>
         </div>
+      </div>
 
-        {/* Events last hour */}
-        <StatCard
-          label="Events (Last Hour)"
-          value={stats.events_last_hour}
-          sub="Real-time monitor"
-          icon="⏱️"
-          color="var(--indigo)"
-        />
+      {/* ── KPI Row ────────────────────────────────────────────────────── */}
+      <div className="grid-4">
+        <StatCard label="Total Events"     value={stats.total_events}     sub="All sources"     icon="📋" animDelay={0}   />
+        <StatCard label="Critical Alerts"  value={stats.critical_alerts}  sub="Requires action" icon="🔴" color="var(--critical)" animDelay={80}  />
+        <StatCard label="Active AI Agents" value={stats.active_agents}    sub="Monitoring now"  icon="🤖" color="var(--teal)"     animDelay={160} />
+        <StatCard label="Threats Resolved" value={stats.threats_resolved} sub="Last 24 hours"   icon="✅" color="var(--low)"      animDelay={240} />
+      </div>
 
-        {/* Severity breakdown */}
+      {/* ── Risk + Severity Row ────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '1rem', alignItems: 'stretch' }}>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '1.5rem', minWidth: 180 }}>
+          <RiskMeter score={stats.avg_risk_score} size={140} />
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Avg Risk Score</span>
+        </div>
+
+        <StatCard label="Events (Last Hour)" value={stats.events_last_hour} sub="Real-time monitor" icon="⏱️" color="var(--indigo)" />
+
         <div className="card">
           <div className="section-head"><h2>Severity Breakdown</h2></div>
           {[
-            { label: 'Critical', sev: 'critical', color: 'var(--critical)' },
-            { label: 'High',     sev: 'high',     color: 'var(--high)'     },
-            { label: 'Medium',   sev: 'medium',   color: 'var(--medium)'   },
-            { label: 'Low',      sev: 'low',      color: 'var(--low)'      },
+            { sev: 'critical', label: 'Critical', color: 'var(--critical)' },
+            { sev: 'high',     label: 'High',     color: 'var(--high)'     },
+            { sev: 'medium',   label: 'Medium',   color: 'var(--medium)'   },
+            { sev: 'low',      label: 'Low',       color: 'var(--low)'     },
           ].map(s => {
             const cnt = events.filter(e => e.severity === s.sev).length;
             const pct = events.length ? (cnt / events.length) * 100 : 0;
@@ -96,9 +143,8 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Main Feed + Chat ───────────────────────────────────────── */}
+      {/* ── Main Feed + Chat ───────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1rem' }}>
-
         {/* Event Timeline / Chart */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', minHeight: 500 }}>
           <div className="section-head">
@@ -124,11 +170,12 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* AI Copilot Chat */}
+        {/* AI Chat */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', minHeight: 500, padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--teal)', boxShadow: '0 0 6px var(--teal)', animation: 'pulse-ring 2s infinite' }} />
             <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>SOC AI Copilot</span>
+            <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Gemini 1.5 Flash</span>
           </div>
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <AgentChat />
@@ -136,14 +183,14 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Critical Alerts Banner ─────────────────────────────────── */}
+      {/* ── Critical Alerts Banner ─────────────────────────────────────── */}
       {criticalEvents.length > 0 && (
         <div className="card" style={{ borderColor: 'rgba(255,59,107,0.35)', background: 'rgba(255,59,107,0.04)' }}>
           <div className="section-head">
             <h2 style={{ color: 'var(--critical)' }}>
               🔴 Critical Alerts &mdash; {criticalEvents.length} Active
             </h2>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Click any alert to investigate</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Click to investigate</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {criticalEvents.slice(0, 5).map(ev => (
@@ -154,21 +201,17 @@ export const Dashboard: React.FC = () => {
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '10px 14px', background: 'var(--bg-secondary)',
                   borderRadius: 8, border: '1px solid rgba(255,59,107,0.25)',
-                  cursor: 'pointer', transition: 'all 0.15s',
+                  cursor: 'pointer', transition: 'background 0.15s',
                 }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-secondary)')}
               >
-                <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                <span>⚠️</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {ev.event_type}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {ev.source} &bull; {ev.user ?? 'unknown'}
-                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{ev.event_type}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{ev.source} &bull; {ev.user ?? 'unknown'}</div>
                 </div>
-                <div style={{ fontWeight: 700, color: 'var(--critical)', fontSize: '1.1rem' }}>
-                  {ev.risk_score}
-                </div>
+                <span style={{ fontWeight: 700, color: 'var(--critical)', fontSize: '1.1rem' }}>{ev.risk_score}</span>
                 <span style={{ color: 'var(--text-muted)' }}>&rsaquo;</span>
               </div>
             ))}
@@ -176,7 +219,6 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ── Event Detail Modal ─────────────────────────────────────── */}
       {selected && <EventDetail event={selected} onClose={() => setSelected(null)} />}
     </div>
   );

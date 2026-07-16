@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Sidebar }        from './components/Sidebar';
 import { Header }         from './components/Header';
 import { Dashboard }      from './pages/Dashboard';
@@ -8,6 +8,7 @@ import { Analytics }      from './pages/Analytics';
 import { ThreatHunt }     from './pages/ThreatHunt';
 import { Investigations } from './pages/Investigations';
 import { Settings }       from './pages/Settings';
+import { Help }           from './pages/Help';
 import { generateEvents, fetchRunCycle } from './hooks/useApi';
 import type { TelemetryEvent } from './types';
 
@@ -18,7 +19,8 @@ export default function App() {
 
   const criticalCount = events.filter(e => e.severity === 'critical').length;
 
-  const runCycle = async () => {
+  const runCycle = useCallback(async () => {
+    if (running) return;
     setRunning(true);
     try {
       const { events: newEvts } = await fetchRunCycle();
@@ -26,17 +28,18 @@ export default function App() {
     } finally {
       setRunning(false);
     }
-  };
+  }, [running]);
 
   const renderPage = () => {
     switch (page) {
-      case 'dashboard':     return <Dashboard />;
-      case 'alerts':        return <LiveAlerts />;
-      case 'agents':        return <AIAgents />;
-      case 'analytics':     return <Analytics />;
-      case 'hunt':          return <ThreatHunt />;
-      case 'investigations':return <Investigations />;
-      case 'settings':      return <Settings />;
+      case 'dashboard':      return <Dashboard />;
+      case 'alerts':         return <LiveAlerts />;
+      case 'agents':         return <AIAgents />;
+      case 'analytics':      return <Analytics />;
+      case 'hunt':           return <ThreatHunt />;
+      case 'investigations': return <Investigations />;
+      case 'settings':       return <Settings />;
+      case 'help':           return <Help />;
       default:
         return (
           <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -44,7 +47,9 @@ export default function App() {
             <h2 style={{ fontSize: '1.2rem', marginBottom: 8, color: 'var(--text-secondary)' }}>
               {page.charAt(0).toUpperCase() + page.slice(1)} &mdash; Coming Soon
             </h2>
-            <p>Switch to <strong>Dashboard</strong> for the full SOC live view.</p>
+            <button className="btn btn--ghost" onClick={() => setPage('dashboard')}>
+              &larr; Back to Dashboard
+            </button>
           </div>
         );
     }
