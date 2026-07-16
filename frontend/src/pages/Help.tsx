@@ -3,11 +3,11 @@ import React, { useState } from 'react';
 const FAQS = [
   {
     q: 'What is Agentic SOC Copilot?',
-    a: 'An AI-powered Security Operations Center platform for banking, built with 6 autonomous AI agents that monitor Azure AD, CrowdStrike, SentinelOne, Palo Alto NGFW, Cisco Duo, and Okta in real time. Developed for FinSpark'26 hackathon.',
+    a: "An AI-powered Security Operations Center platform for banking, built with 6 autonomous AI agents that monitor Azure AD, CrowdStrike, SentinelOne, Palo Alto NGFW, Cisco Duo, and Okta in real time. Developed for FinSpark'26 hackathon.",
   },
   {
     q: 'How does the AI chat work?',
-    a: 'The SOC Copilot uses Google Gemini 1.5 Flash with a banking security system prompt. It has access to live event counts and risk scores from the backend. Add your GEMINI_API_KEY to .env to enable live AI. Without a key, intelligent fallback responses are provided.',
+    a: "The SOC Copilot uses Google Gemini 1.5 Flash with a banking security system prompt. It has access to live event counts and risk scores from the backend. Add your GEMINI_API_KEY to .env to enable live AI. Without a key, intelligent fallback responses are provided.",
   },
   {
     q: 'What does "Run Detection Cycle" do?',
@@ -15,7 +15,7 @@ const FAQS = [
   },
   {
     q: 'How does the risk score work?',
-    a: 'Each event is scored 0–100 by AI analysis of behavioral patterns, threat intelligence, and context. Critical = 85–100, High = 60–84, Medium = 35–59, Low = 10–34. The dashboard shows the average across all recent events.',
+    a: 'Each event is scored 0-100 by AI analysis of behavioral patterns, threat intelligence, and context. Critical = 85-100, High = 60-84, Medium = 35-59, Low = 10-34. The dashboard shows the average across all recent events.',
   },
   {
     q: 'Is this connected to real data?',
@@ -23,7 +23,7 @@ const FAQS = [
   },
   {
     q: 'How do I start the full backend?',
-    a: 'Install Python deps: pip install -r backend/requirements.txt. Add GEMINI_API_KEY to .env. Run: cd backend && python -m uvicorn app.main:app --reload --port 8000. API docs at http://localhost:8000/docs.',
+    a: "Install Python deps: pip install -r backend/requirements.txt. Add GEMINI_API_KEY to .env. Run: cd backend, then python -m uvicorn app.main:app --reload --port 8000. API docs at http://localhost:8000/docs.",
   },
 ];
 
