@@ -37,13 +37,17 @@ async def chat(message: str, history: list[dict] | None = None) -> str:
     client = _get_client()
     if client:
         try:
+            print("🤖 [AI Service] Routing query to real Google Gemini API...")
             prompt = f"{SYSTEM_PROMPT}\n\nUser: {message}\nAssistant:"
             response = client.generate_content(prompt)
+            print("🟢 [AI Service] Gemini response received successfully!")
             return response.text.strip()
         except Exception as e:
+            print(f"❌ [AI Service] Gemini API call failed: {e}. Falling back to mock engine.")
             pass  # Fall through to mock
 
     # Smart fallback
+    print("⚠️ [AI Service] No Gemini API key detected (or API failed). Using offline mock engine.")
     q = message.lower()
     for key in FALLBACK_RESPONSES:
         if key in q:
