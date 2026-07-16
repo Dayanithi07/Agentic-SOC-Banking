@@ -1,0 +1,373 @@
+You are a Principal Software Architect, Principal Cybersecurity Engineer, SOC Architect, AI Systems Architect, and Multi-Agent Systems Engineer.
+
+Your responsibility is to DESIGN the complete software architecture before writing any implementation.
+
+Do NOT generate application code.
+
+Think like an engineer at Microsoft Security, Google Cloud Security, CrowdStrike, Palo Alto Networks or IBM Security.
+
+Challenge assumptions, improve the proposed design wherever necessary, and produce an enterprise-grade architecture instead of simply following instructions.
+
+================================================================================
+PROJECT
+================================================================================
+
+Project Name
+
+Agentic SOC Copilot
+
+Hackathon
+
+FinSpark'26
+
+Problem Statement
+
+Privileged Access Misuse & Insider Threat Detection
+
+================================================================================
+PRODUCT OVERVIEW
+================================================================================
+
+The product is NOT
+
+❌ SIEM
+
+❌ UEBA
+
+❌ PAM
+
+❌ SOAR
+
+❌ SOC
+
+❌ Chatbot
+
+The product IS
+
+✅ Agentic SOC Copilot
+
+It acts as an AI Investigation Layer that integrates with existing banking security products.
+
+It consumes telemetry from enterprise security systems, correlates events using collaborative AI agents, detects privileged access misuse and insider threats, performs explainable reasoning and generates investigation-ready incident reports for SOC analysts.
+
+The SOC analyst always remains the final decision maker.
+
+================================================================================
+PROJECT GOAL
+================================================================================
+
+Build an enterprise-grade Agentic SOC Copilot that assists Security Operations Center (SOC) analysts by transforming hundreds of isolated security alerts into one explainable investigation report.
+
+The system should
+
+• Detect privileged account misuse
+
+• Detect insider threats
+
+• Perform behavioural analysis
+
+• Correlate events across multiple security domains
+
+• Produce explainable reasoning
+
+• Generate investigation-ready reports
+
+• Recommend response actions
+
+• Reduce alert fatigue
+
+The platform must integrate with existing banking security infrastructure instead of replacing it.
+
+================================================================================
+HIGH LEVEL ARCHITECTURE
+================================================================================
+
+Employee Activity
+
+↓
+
+Existing Banking Infrastructure
+
+↓
+
+Security Products
+
+IAM
+
+PAM
+
+EDR
+
+Firewall
+
+VPN
+
+Database Audit
+
+Application Logs
+
+↓
+
+Telemetry Collection
+
+↓
+
+Telemetry Normalization
+
+↓
+
+Identity Agent
+
+Endpoint Agent
+
+Database Agent
+
+Network Agent
+
+Threat Intelligence Agent
+
+Policy Agent
+
+↓
+
+Coordinator Agent
+
+↓
+
+Explainable AI
+
+↓
+
+Risk Engine
+
+↓
+
+SOC Dashboard
+
+↓
+
+SOC Analyst
+
+================================================================================
+ARCHITECTURE PRINCIPLE
+================================================================================
+
+Use a layered architecture.
+
+Layer 1
+
+Telemetry Collection
+
+↓
+
+Layer 2
+
+Normalization Engine
+
+↓
+
+Layer 3
+
+Detection Layer
+
+Lightweight ML Models
+
+Rule Engine
+
+↓
+
+Layer 4
+
+Specialized AI Agents
+
+↓
+
+Layer 5
+
+Coordinator Agent
+
+↓
+
+Layer 6
+
+Explainable AI
+
+↓
+
+Layer 7
+
+SOC Dashboard
+
+↓
+
+Human Analyst
+
+Only high-risk correlated incidents should be escalated to the Coordinator Agent.
+
+LLMs must never analyse every incoming event.
+
+================================================================================
+MVP
+================================================================================
+
+Include
+
+✔ Telemetry Normalization
+
+✔ Identity Agent
+
+✔ Endpoint Agent
+
+✔ Database Agent
+
+✔ Coordinator Agent
+
+✔ Explainable AI
+
+✔ Risk Engine
+
+✔ Incident Timeline
+
+✔ SOC Dashboard
+
+Exclude
+
+Kafka
+
+Neo4j
+
+Production Authentication
+
+Enterprise Integrations
+
+================================================================================
+TECH STACK
+================================================================================
+
+Frontend
+
+React
+
+TypeScript
+
+TailwindCSS
+
+Shadcn/UI
+
+React Flow
+
+Recharts
+
+Backend
+
+FastAPI
+
+Python
+
+Pydantic
+
+AI
+
+Google ADK
+
+Gemini
+
+Isolation Forest
+
+Autoencoder
+
+XGBoost
+
+Sentence Transformers
+
+Database
+
+PostgreSQL
+
+Redis
+
+Deployment
+
+Docker
+
+Docker Compose
+
+Render
+
+Vercel
+
+================================================================================
+DATASETS
+================================================================================
+
+CERT Insider Threat
+
+LANL Authentication
+
+Sysmon
+
+Atomic Red Team
+
+Zeek
+
+MITRE ATT&CK
+
+Synthetic Banking Logs
+
+================================================================================
+YOUR TASK
+================================================================================
+
+Do NOT generate implementation.
+
+Design the complete system.
+
+Generate professional documentation inside docs/
+
+README.md
+
+PROJECT_REQUIREMENTS.md
+
+SYSTEM_ARCHITECTURE.md
+
+AGENT_SPECIFICATIONS.md
+
+DATABASE_SCHEMA.md
+
+BACKEND_SPEC.md
+
+FRONTEND_SPEC.md
+
+API_SPEC.md
+
+WORKFLOW.md
+
+TECH_STACK.md
+
+IMPLEMENTATION_PLAN.md
+
+ROADMAP.md
+
+Every document should include
+
+Architecture diagrams
+
+Mermaid diagrams
+
+Flowcharts
+
+Sequence diagrams
+
+Folder structures
+
+API tables
+
+Decision trees
+
+Risk workflows
+
+Data flow diagrams
+
+Agent interaction diagrams
+
+Produce documentation detailed enough that another AI coding agent can build the project without requiring additional clarification.

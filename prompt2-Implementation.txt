@@ -1,0 +1,215 @@
+You are now the Lead Software Engineer responsible for implementing the project based on the architecture and documentation created in Phase 1.
+
+Do not redesign the architecture unless necessary.
+
+Follow the documentation exactly.
+
+================================================================================
+PROJECT
+================================================================================
+
+Build the complete Agentic SOC Copilot.
+
+The architecture and documentation already exist.
+
+Your responsibility is implementation.
+
+================================================================================
+IMPLEMENTATION REQUIREMENTS
+================================================================================
+
+Use clean architecture.
+
+Follow SOLID principles.
+
+Use modular development.
+
+Every module must be independently testable.
+
+Write production-quality code.
+
+Use type hints.
+
+Use proper logging.
+
+Use configuration files.
+
+Write reusable components.
+
+Use asynchronous programming where appropriate.
+
+================================================================================
+PROJECT STRUCTURE
+================================================================================
+
+frontend/
+
+backend/
+
+agents/
+
+identity/
+
+endpoint/
+
+database/
+
+network/
+
+threat/
+
+policy/
+
+coordinator/
+
+telemetry/
+
+normalizer/
+
+risk_engine/
+
+shared/
+
+datasets/
+
+deployment/
+
+docs/
+
+================================================================================
+IMPLEMENTATION ORDER
+================================================================================
+
+Phase 1
+
+Project initialization
+
+Folder structure
+
+Configuration
+
+Environment
+
+Docker
+
+================================================================================
+
+Phase 2
+
+Backend
+
+FastAPI
+
+Authentication
+
+Database
+
+Shared models
+
+================================================================================
+
+Phase 3
+
+Telemetry
+
+Normalization Engine
+
+================================================================================
+
+Phase 4
+
+Identity Agent
+
+Endpoint Agent
+
+Database Agent
+
+================================================================================
+
+Phase 5
+
+Threat Agent
+
+Policy Agent
+
+Coordinator Agent
+
+================================================================================
+
+Phase 6
+
+Risk Engine
+
+Explainable AI
+
+Incident Generator
+
+================================================================================
+
+Phase 7
+
+Frontend Dashboard
+
+Authentication
+
+Analytics
+
+Incident Viewer
+
+Timeline
+
+Risk Charts
+
+================================================================================
+
+Phase 8
+
+Integration
+
+Testing
+
+Deployment
+
+================================================================================
+IMPLEMENTATION GUIDELINES
+================================================================================
+
+Every AI agent must have
+
+Purpose
+
+Input Schema
+
+Output Schema
+
+Service Layer
+
+Inference Layer
+
+Prompt Template (if using Gemini)
+
+Evaluation Logic
+
+Unit Tests
+
+API Endpoints
+
+Every backend module must expose REST APIs.
+
+Every frontend page must be responsive.
+
+Every service should include logging and error handling.
+
+================================================================================
+EXPECTED OUTPUT
+================================================================================
+
+Generate the complete project.
+
+Implement one module at a time.
+
+Never skip documentation.
+
+Maintain enterprise coding standards.
+
+Keep the system extensible so additional AI agents, new banking telemetry sources, and production integrations can be added later.
