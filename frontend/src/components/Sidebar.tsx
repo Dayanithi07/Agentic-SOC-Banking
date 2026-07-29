@@ -11,6 +11,7 @@ const NAV: NavItem[] = [
   { icon: '📋', label: 'Investigations', id: 'investigations' },
   { icon: '🛡️', label: 'Vulnerabilities',id: 'vulnerabilities'},
   { icon: '🌐', label: 'Network Map',    id: 'network'  },
+  { icon: '🛍️', label: 'Target Store & SDK', id: 'store' },
 ];
 const BOTTOM: NavItem[] = [
   { icon: '⚙️', label: 'Settings', id: 'settings' },

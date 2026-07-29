@@ -89,9 +89,8 @@ export async function fetchRunCycle(): Promise<{ events: TelemetryEvent[]; messa
       }));
       return { events: mapped, message: data.message };
     }
-  } catch { /* fall through to mock */ }
-  await new Promise(r => setTimeout(r, 800));
-  return { events: generateEvents(5), message: 'Agent cycle complete (demo mode)' };
+  } catch { /* ignore */ }
+  return { events: [], message: 'Backend unreachable' };
 }
 
 export async function chatWithAgent(

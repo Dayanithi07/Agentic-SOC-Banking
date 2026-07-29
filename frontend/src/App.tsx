@@ -11,6 +11,7 @@ import { Settings }       from './pages/Settings';
 import { Help }           from './pages/Help';
 import { Vulnerabilities } from './pages/Vulnerabilities';
 import { NetworkMap }      from './pages/NetworkMap';
+import { TargetStore }     from './pages/TargetStore';
 import { generateEvents, fetchRunCycle } from './hooks/useApi';
 import type { TelemetryEvent } from './types';
 
@@ -44,6 +45,7 @@ export default function App() {
       case 'help':           return <Help />;
       case 'vulnerabilities': return <Vulnerabilities />;
       case 'network':         return <NetworkMap />;
+      case 'store':           return <TargetStore />;
       default:
         return (
           <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>

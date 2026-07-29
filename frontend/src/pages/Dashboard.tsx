@@ -96,7 +96,20 @@ export const Dashboard: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  // ── Poll live stats from backend every 3s ────────────────────────────
+  // ── Load initial events from backend API on mount ───────────────────
+  useEffect(() => {
+    fetch(`${API}/api/events?limit=50`)
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const mapped = data.map(raw => mapRawToEvent(raw)).filter(Boolean) as TelemetryEvent[];
+          setEvents(mapped);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Poll live stats from backend every 1s ────────────────────────────
   useEffect(() => {
     const poll = async () => {
       try {
@@ -125,7 +138,7 @@ export const Dashboard: React.FC = () => {
       } catch { /* backend offline */ }
     };
     poll();
-    const iv = setInterval(poll, 3000);
+    const iv = setInterval(poll, 1000);
     return () => clearInterval(iv);
   }, []);
 
