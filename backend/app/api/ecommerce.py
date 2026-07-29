@@ -115,3 +115,75 @@ async def checkout(request: Request, authorization: Optional[str] = Header(None)
     )
     await _process_and_broadcast(event)
     return {"status": "success", "order_id": "ORD-NEW"}
+
+class IngestEventRequest(BaseModel):
+    event_type: str = "web_request"
+    user_id: Optional[str] = "external_user"
+    ip_address: Optional[str] = None
+    endpoint: Optional[str] = "/live-website"
+    http_method: Optional[str] = "GET"
+    severity: Optional[str] = "info"
+    mitre_tactic: Optional[str] = None
+    mitre_technique: Optional[str] = None
+    metadata: Optional[dict] = {}
+
+@router.post("/telemetry/ingest")
+async def ingest_live_telemetry(req: IngestEventRequest, request: Request):
+    """Universal ingestion endpoint for external websites."""
+    ip = req.ip_address or (request.client.host if request.client else "external_ip")
+    event = SecurityEvent(
+        event_type=req.event_type,
+        user_id=req.user_id,
+        ip_address=ip,
+        endpoint=req.endpoint,
+        http_method=req.http_method,
+        severity=req.severity or "info",
+        mitre_tactic=req.mitre_tactic,
+        mitre_technique=req.mitre_technique,
+        metadata=req.metadata or {}
+    )
+    await _process_and_broadcast(event)
+    return {"status": "ingested", "event_id": event.event_id}
+
+@router.get("/sdk/soc-agent.js")
+async def get_soc_sdk_script():
+    """Returns 1-line JS SDK to auto-monitor any live website."""
+    js_code = """
+(function() {
+    const SOC_ENDPOINT = 'http://localhost:8000/api/telemetry/ingest';
+    console.log('[SOC Copilot] Live Website Security Telemetry Monitoring Active');
+    
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+        const method = args[1]?.method || 'GET';
+        
+        try {
+            const response = await originalFetch.apply(this, args);
+            if (!url.includes('/api/telemetry')) {
+                let severity = 'info';
+                let event_type = 'web_request';
+                if (response.status === 401) { severity = 'medium'; event_type = 'login_failure'; }
+                if (response.status === 403) { severity = 'critical'; event_type = 'access_control_violation'; }
+                
+                originalFetch(SOC_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_type: event_type,
+                        endpoint: url,
+                        http_method: method,
+                        severity: severity,
+                        metadata: { status_code: response.status, origin: window.location.href }
+                    })
+                }).catch(() => {});
+            }
+            return response;
+        } catch (err) {
+            throw err;
+        }
+    };
+})();
+"""
+    from fastapi.responses import Response
+    return Response(content=js_code, media_type="application/javascript")

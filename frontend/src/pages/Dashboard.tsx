@@ -59,6 +59,30 @@ export const Dashboard: React.FC = () => {
   const wsRef        = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef   = useRef(true);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // File upload handler
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch(`${API}/api/replay/upload`, { method: 'POST', body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedScenario(data.filename);
+        // Refresh scenario list
+        const listRes = await fetch(`${API}/api/replay/scenarios`);
+        if (listRes.ok) {
+          const d = await listRes.json();
+          setScenarios(d.scenarios || []);
+        }
+      }
+    } catch (err) { console.error(err); }
+    // Reset input so same file can be re-uploaded
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   // ── Fetch scenarios from backend ─────────────────────────────────────
   useEffect(() => {
@@ -235,6 +259,28 @@ export const Dashboard: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".jsonl,.json,.txt,application/json,text/plain,*/*"
+              style={{ display: 'none' }}
+              onChange={handleFileUpload}
+            />
+
+            {/* Upload button */}
+            <button
+              className="btn btn--ghost"
+              style={{
+                fontSize: '0.78rem', padding: '6px 12px',
+                border: '1px dashed var(--cyan)', color: 'var(--cyan)',
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={replayStatus === 'running'}
+            >
+              📤 Upload .jsonl
+            </button>
+
             {/* Scenario Dropdown */}
             <select
               value={selectedScenario}

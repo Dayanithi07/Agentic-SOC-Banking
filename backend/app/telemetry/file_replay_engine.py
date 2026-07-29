@@ -21,41 +21,81 @@ def list_scenarios() -> List[str]:
     return [f for f in os.listdir(SCENARIOS_DIR) if f.endswith(".jsonl") or f.endswith(".json")]
 
 
+def _parse_dict_to_event(data: dict) -> Optional[SecurityEvent]:
+    try:
+        kwargs = {
+            "timestamp": data.get("timestamp") or datetime.utcnow().isoformat() + "Z",
+            "source": data.get("source", "ecommerce_app"),
+            "event_type": data.get("event_type", "web_request"),
+            "user_id": data.get("user_id") or data.get("user"),
+            "role": data.get("role"),
+            "ip_address": data.get("ip_address") or data.get("ip"),
+            "endpoint": data.get("endpoint"),
+            "http_method": data.get("http_method", "GET"),
+            "severity": data.get("severity", "info"),
+            "mitre_tactic": data.get("mitre_tactic"),
+            "mitre_technique": data.get("mitre_technique"),
+            "metadata": data.get("metadata") or {}
+        }
+        if data.get("event_id") or data.get("id"):
+            kwargs["event_id"] = data.get("event_id") or data.get("id")
+
+        return SecurityEvent(**kwargs)
+    except Exception as e:
+        print(f"Error parsing log dict: {e}")
+        return None
+
 def load_scenario_events(filename: str) -> List[SecurityEvent]:
-    """Load and parse events from a JSONL scenario file chronologically."""
+    """Load and parse events from a JSONL or JSON scenario file chronologically."""
     filepath = os.path.join(SCENARIOS_DIR, filename)
     if not os.path.exists(filepath):
         return []
 
     events = []
     with open(filepath, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                data = json.loads(line)
-                kwargs = {
-                    "timestamp": data.get("timestamp") or datetime.utcnow().isoformat() + "Z",
-                    "source": data.get("source", "ecommerce_app"),
-                    "event_type": data.get("event_type", "web_request"),
-                    "user_id": data.get("user_id") or data.get("user"),
-                    "role": data.get("role"),
-                    "ip_address": data.get("ip_address") or data.get("ip"),
-                    "endpoint": data.get("endpoint"),
-                    "http_method": data.get("http_method", "GET"),
-                    "severity": data.get("severity", "info"),
-                    "mitre_tactic": data.get("mitre_tactic"),
-                    "mitre_technique": data.get("mitre_technique"),
-                    "metadata": data.get("metadata") or {}
-                }
-                if data.get("event_id") or data.get("id"):
-                    kwargs["event_id"] = data.get("event_id") or data.get("id")
+        content = f.read().strip()
 
-                evt = SecurityEvent(**kwargs)
-                events.append(evt)
-            except Exception as e:
-                print(f"Error parsing log line: {e}")
+    if not content:
+        return []
+
+    # First attempt parsing full content as JSON (array or dict wrapper)
+    try:
+        parsed_json = json.loads(content)
+        if isinstance(parsed_json, list):
+            for item in parsed_json:
+                if isinstance(item, dict):
+                    evt = _parse_dict_to_event(item)
+                    if evt:
+                        events.append(evt)
+            if events:
+                events.sort(key=lambda e: e.timestamp)
+                return events
+        elif isinstance(parsed_json, dict):
+            raw_list = parsed_json.get("events") or parsed_json.get("data") or [parsed_json]
+            for item in raw_list:
+                if isinstance(item, dict):
+                    evt = _parse_dict_to_event(item)
+                    if evt:
+                        events.append(evt)
+            if events:
+                events.sort(key=lambda e: e.timestamp)
+                return events
+    except Exception:
+        pass
+
+    # Fallback to line-by-line JSONL parsing
+    for line in content.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+            if isinstance(data, dict):
+                evt = _parse_dict_to_event(data)
+                if evt:
+                    events.append(evt)
+        except Exception as e:
+            print(f"Error parsing line: {e}")
 
     try:
         events.sort(key=lambda e: e.timestamp)

@@ -1,15 +1,31 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
+import os
 from app.telemetry.scheduler import scheduler, ReplayState
 from app.telemetry.live_engine import live_loop
 from app.telemetry.file_replay_engine import (
     list_scenarios,
     file_replay_loop,
+    SCENARIOS_DIR,
 )
 import app.telemetry.file_replay_engine as file_engine
 
 router = APIRouter(prefix="/api/replay", tags=["Replay"])
+
+@router.post("/upload")
+async def upload_scenario(file: UploadFile = File(...)):
+    """Upload a .jsonl log file for replay."""
+    filename = file.filename or "uploaded_scenario.jsonl"
+    if not filename.endswith((".jsonl", ".json")):
+        filename += ".jsonl"
+    os.makedirs(SCENARIOS_DIR, exist_ok=True)
+    dest = os.path.join(SCENARIOS_DIR, filename)
+    content = await file.read()
+    with open(dest, "wb") as f:
+        f.write(content)
+    file_engine.active_scenario_file = filename
+    return {"status": "uploaded", "filename": filename, "size_bytes": len(content)}
 
 class SpeedRequest(BaseModel):
     speed: int
