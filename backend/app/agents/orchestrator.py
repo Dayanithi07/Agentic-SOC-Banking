@@ -174,10 +174,14 @@ class Orchestrator:
 
     def _incident_title(self, trigger: SecurityEvent, events: list[SecurityEvent]) -> str:
         attack_types = {e.event_type for e in events if e.severity in ("critical", "high")}
+        if "access_control_violation" in attack_types:
+            return "IDOR / Access Control Violation Detected"
         if "sql_injection_attempt" in attack_types:
             return "SQL Injection Attack Detected"
         if "login_failure" in attack_types and any(e.event_type == "data_export" for e in events):
             return "Credential Stuffing & Data Exfiltration"
+        if "login_failure" in attack_types:
+            return "Brute Force / Credential Attack"
         if "lateral_movement" in attack_types:
             return "Insider Threat — Lateral Movement"
         if "privilege_escalation" in attack_types:
@@ -194,6 +198,16 @@ class Orchestrator:
     ) -> list[Finding]:
         findings = []
         event_types = {e.event_type for e in events}
+
+        if "access_control_violation" in event_types:
+            findings.append(Finding(
+                title="Insecure Direct Object Reference (IDOR)",
+                category="Access Control",
+                description=f"Unauthorized access attempt to resource {trigger.endpoint or '/api/orders'} by user {trigger.user_id or 'unknown'}",
+                severity="Critical",
+                affected_endpoint=trigger.endpoint,
+                risk_score=94,
+            ))
 
         if "sql_injection_attempt" in event_types:
             payloads = [

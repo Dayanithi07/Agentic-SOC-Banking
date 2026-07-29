@@ -26,6 +26,41 @@ def _heuristic_investigation(
     ips = list({e.ip_address for e in events if e.ip_address})
     critical = [e for e in events if e.severity in ("critical", "high")]
 
+    # IDOR / Access Control Violation scenario
+    if event_types.get("access_control_violation", 0) >= 1 or any("idor" in (e.event_type or "").lower() for e in events):
+        idor_events = [e for e in events if e.event_type == "access_control_violation"]
+        user_name = users[0] if users else "authenticated_user"
+        target_endpoint = idor_events[0].endpoint if idor_events else "/api/orders"
+        evidence = [
+            f"User '{user_name}' attempted unauthorized access to resource {target_endpoint}",
+            f"HTTP 403 Access Control Violation thrown by security gateway",
+            f"Source IP: {ips[0] if ips else 'unknown'}",
+        ]
+        return InvestigationResult(
+            incident_summary=(
+                f"Insecure Direct Object Reference (IDOR) violation detected. "
+                f"User '{user_name}' from IP {ips[0] if ips else 'unknown'} attempted to read or modify "
+                f"restricted records on endpoint {target_endpoint}."
+            ),
+            evidence=evidence,
+            attack_sequence=(
+                f"User Login ({user_name}) → Endpoint Probe ({target_endpoint}) → "
+                f"IDOR Object Parameter Tampering → Access Control Gate Failure (403 Forbidden) → SOC Alert"
+            ),
+            confidence=0.95,
+            related_finding_ids=[f.finding_id for f in findings],
+            recommended_action=(
+                "1. Enforce strict server-side ownership check (order.user_id == current_user.id). "
+                "2. Replace sequential integer IDs (ORD-1, ORD-2) with unpredictable UUIDs. "
+                "3. Audit all /api/orders and account endpoints for authorization bypass vulnerabilities."
+            ),
+            ai_explanation=(
+                f"An IDOR (Insecure Direct Object Reference) attack occurred when user '{user_name}' "
+                f"manipulated resource identifiers in HTTP requests to access records belonging to another user. "
+                f"The security monitoring system intercepted the unauthorized access attempt and flagged the endpoint."
+            ),
+        )
+
     # SQL Injection scenario
     if event_types.get("sql_injection_attempt", 0) >= 1:
         sqli_events = [e for e in events if e.event_type == "sql_injection_attempt"]
