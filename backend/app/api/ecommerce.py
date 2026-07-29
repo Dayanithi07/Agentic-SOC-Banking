@@ -2,10 +2,20 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 import datetime
+import asyncio
 from app.services.event_store import store
 from app.models.event import SecurityEvent
+from app.agents.orchestrator import orchestrator
+from app.api.websocket import broadcast_event
+from app.telemetry.anomaly_detector import anomaly_detector
 
 router = APIRouter(prefix="/api", tags=["E-Commerce"])
+
+async def _process_and_broadcast(event: SecurityEvent):
+    await store.add(event)
+    anomaly_detector.ingest(event)
+    asyncio.create_task(orchestrator.process_event(event))
+    await broadcast_event(event.model_dump())
 
 # Mock DB for e-commerce
 users_db = {"john.smith": "password123", "admin": "admin_pass"}
@@ -27,7 +37,7 @@ async def login(req: LoginRequest, request: Request):
             severity="info",
             status="resolved"
         )
-        await store.add(event)
+        await _process_and_broadcast(event)
         return {"token": f"mock_token_{req.username}"}
     
     event = SecurityEvent(
@@ -36,9 +46,11 @@ async def login(req: LoginRequest, request: Request):
         ip_address=ip,
         endpoint="/api/auth/login",
         severity="medium",
-        status="new"
+        status="new",
+        mitre_tactic="Credential Access",
+        mitre_technique="T1110 - Brute Force"
     )
-    await store.add(event)
+    await _process_and_broadcast(event)
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 @router.get("/orders/{order_id}")
@@ -50,9 +62,11 @@ async def get_order(order_id: str, request: Request, authorization: Optional[str
             ip_address=ip,
             endpoint=f"/api/orders/{order_id}",
             severity="high",
-            status="new"
+            status="new",
+            mitre_tactic="Initial Access",
+            mitre_technique="T1190 - Exploit Public-Facing Application"
         )
-        await store.add(event)
+        await _process_and_broadcast(event)
         raise HTTPException(status_code=401, detail="Missing auth token")
     
     # Very naive auth simulation
@@ -72,11 +86,11 @@ async def get_order(order_id: str, request: Request, authorization: Optional[str
             endpoint=f"/api/orders/{order_id}",
             severity="critical",
             status="new",
+            mitre_tactic="Privilege Escalation",
+            mitre_technique="T1548 - Abuse Elevation Control Mechanism",
             metadata={"attempted_access": order["user"]}
         )
-        await store.add(event)
-        # We could still return it if simulating broken access control
-        # but let's just deny it and log it for now
+        await _process_and_broadcast(event)
         raise HTTPException(status_code=403, detail="Forbidden")
 
     return order
@@ -99,5 +113,5 @@ async def checkout(request: Request, authorization: Optional[str] = Header(None)
         endpoint="/api/checkout",
         severity="info"
     )
-    await store.add(event)
+    await _process_and_broadcast(event)
     return {"status": "success", "order_id": "ORD-NEW"}
