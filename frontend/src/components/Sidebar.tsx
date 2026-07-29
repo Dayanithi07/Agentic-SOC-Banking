@@ -3,18 +3,13 @@ import React from 'react';
 interface NavItem { icon: string; label: string; id: string; badge?: number; }
 
 const NAV: NavItem[] = [
-  { icon: '🛡️', label: 'Dashboard',      id: 'dashboard' },
-  { icon: '⚡',  label: 'Live Alerts',    id: 'alerts'   },
-  { icon: '🔍', label: 'Threat Hunt',    id: 'hunt'     },
-  { icon: '🤖', label: 'AI Agents',      id: 'agents'   },
-  { icon: '📊', label: 'Analytics',      id: 'analytics'},
-  { icon: '📋', label: 'Investigations', id: 'investigations' },
-  { icon: '🛡️', label: 'Vulnerabilities',id: 'vulnerabilities'},
-  { icon: '🌐', label: 'Network Map',    id: 'network'  },
-  { icon: '🛍️', label: 'Target Store & SDK', id: 'store' },
+  { icon: '🛡️', label: 'Dashboard',            id: 'dashboard' },
+  { icon: '📋', label: 'Investigations',       id: 'investigations' },
+  { icon: '🤖', label: 'AI Agents',            id: 'agents'   },
+  { icon: '🌐', label: 'Network Map',          id: 'network'  },
+  { icon: '🌐', label: 'Real Website Monitor', id: 'store' },
 ];
 const BOTTOM: NavItem[] = [
-  { icon: '⚙️', label: 'Settings', id: 'settings' },
   { icon: '❓', label: 'Help',     id: 'help'     },
 ];
 

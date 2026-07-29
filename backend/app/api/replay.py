@@ -4,6 +4,7 @@ from typing import Optional
 import os
 from app.telemetry.scheduler import scheduler, ReplayState
 from app.telemetry.live_engine import live_loop
+from app.telemetry.continuous_replay import continuous_replay_loop, sync_scenario_files
 from app.telemetry.file_replay_engine import (
     list_scenarios,
     file_replay_loop,
@@ -27,6 +28,22 @@ async def upload_scenario(file: UploadFile = File(...)):
     file_engine.active_scenario_file = filename
     return {"status": "uploaded", "filename": filename, "size_bytes": len(content)}
 
+from app.database.connection import async_session_maker
+from app.database.models import SecurityEventDB, FindingDB, IncidentDB, AgentRunDB
+from sqlalchemy import delete
+
+@router.post("/clear-db")
+async def clear_database():
+    """Wipe all events, findings, incidents, and agent runs for a clean demo start."""
+    scheduler.stop()
+    async with async_session_maker() as session:
+        await session.execute(delete(SecurityEventDB))
+        await session.execute(delete(FindingDB))
+        await session.execute(delete(IncidentDB))
+        await session.execute(delete(AgentRunDB))
+        await session.commit()
+    return {"status": "cleared", "message": "Database wiped clean"}
+
 class SpeedRequest(BaseModel):
     speed: int
 
@@ -40,7 +57,7 @@ async def get_status():
 @router.get("/scenarios")
 async def get_scenarios():
     """List available .jsonl scenario files in backend/data/scenarios/."""
-    files = list_scenarios()
+    files = sync_scenario_files()
     return {
         "scenarios": files,
         "active_scenario": file_engine.active_scenario_file
@@ -57,9 +74,11 @@ async def select_scenario(req: SelectScenarioRequest):
 
 @router.post("/start")
 async def start_replay(mode: Optional[str] = "file"):
-    """Start replay mode='file' for JSONL scenario, mode='live' for random stream."""
+    """Start replay: mode='file' for single JSONL, mode='live' for random stream, mode='continuous' for all scenarios."""
     if mode == "live":
         scheduler.start(live_loop)
+    elif mode == "continuous":
+        scheduler.start(continuous_replay_loop)
     else:
         scheduler.start(file_replay_loop)
     return {"status": "started", "mode": mode, "active_scenario": file_engine.active_scenario_file}

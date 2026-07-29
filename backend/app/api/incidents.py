@@ -35,6 +35,28 @@ async def get_incidents():
         ]
 
 
+@router.get("/by-event/{event_id}")
+async def get_incident_by_event(event_id: str):
+    """Find incident linked to a specific event."""
+    async with async_session_maker() as session:
+        result = await session.execute(select(IncidentDB).order_by(IncidentDB.created_at.desc()).limit(200))
+        for i in result.scalars().all():
+            if event_id in (i.related_event_ids or []):
+                return {
+                    "incident_id": i.incident_id,
+                    "title": i.title,
+                    "summary": i.summary,
+                    "risk_score": i.risk_score,
+                    "status": i.status,
+                    "recommendation": i.recommendation,
+                    "ai_explanation": i.ai_explanation,
+                    "mitre_tactics": i.mitre_tactics or [],
+                    "mitre_techniques": i.mitre_techniques or [],
+                    "evidence_chain": i.evidence_chain or [],
+                }
+    return {"error": "No incident found for this event"}
+
+
 @router.get("/{incident_id}")
 async def get_incident_detail(incident_id: str):
     async with async_session_maker() as session:

@@ -6,9 +6,13 @@ const SEV_COLOR: Record<string, string> = {
   medium: 'var(--medium)', low: 'var(--low)', info: 'var(--info)',
 };
 
-interface Props { event: TelemetryEvent; onClose: () => void; }
+interface Props {
+  event: TelemetryEvent;
+  onClose: () => void;
+  onInvestigate?: (event: TelemetryEvent) => void;
+}
 
-export const EventDetail: React.FC<Props> = ({ event, onClose }) => {
+export const EventDetail: React.FC<Props> = ({ event, onClose, onInvestigate }) => {
   const col = SEV_COLOR[event.severity] ?? 'var(--info)';
   return (
     <div
@@ -115,7 +119,7 @@ export const EventDetail: React.FC<Props> = ({ event, onClose }) => {
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="btn btn--ghost" onClick={onClose}>Dismiss</button>
-          <button className="btn btn--primary">Investigate &rarr;</button>
+          <button className="btn btn--primary" onClick={() => onInvestigate?.(event)}>Investigate &rarr;</button>
         </div>
       </div>
     </div>

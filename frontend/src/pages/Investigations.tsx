@@ -1,31 +1,68 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AttackTimeline } from '../components/AttackTimeline';
+import { useTelemetryWebSocket, API_BASE } from '../hooks/useTelemetryWebSocket';
 
-const API = 'http://localhost:8000';
+const API = API_BASE;
 
 export const Investigations: React.FC = () => {
   const [incidents, setIncidents] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
   const [timeline, setTimeline] = useState<any>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [attackSequence, setAttackSequence] = useState<string>('');
+
+  const fetchIncidents = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/incidents`);
+      if (res.ok) {
+        const data = await res.json();
+        setIncidents(data);
+      }
+    } catch (e) { console.error(e); }
+  }, []);
 
   useEffect(() => {
-    const fetchIncidents = async () => {
-      try {
-        const res = await fetch(`${API}/api/incidents`);
-        if (res.ok) setIncidents(await res.json());
-      } catch (e) { console.error(e); }
-    };
     fetchIncidents();
     const interval = setInterval(fetchIncidents, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchIncidents]);
+
+  const { status: wsStatus } = useTelemetryWebSocket({
+    onIncident: (inc) => {
+      setIncidents(prev => {
+        const exists = prev.some(i => i.incident_id === inc.incident_id);
+        if (exists) return prev;
+        return [{
+          incident_id: inc.incident_id,
+          title: inc.title,
+          summary: inc.summary,
+          risk_score: inc.risk_score,
+          status: inc.status || 'new',
+          recommendation: inc.recommendation,
+          ai_explanation: inc.ai_explanation,
+          mitre_tactics: inc.mitre_tactics || [],
+          mitre_techniques: inc.mitre_techniques || [],
+          evidence_chain: inc.evidence_chain || [],
+          related_event_ids: inc.related_event_ids || [],
+          attack_sequence: inc.attack_sequence,
+        }, ...prev];
+      });
+    },
+  });
 
   const openDetail = async (inc: any) => {
     setSelected(inc);
+    setAttackSequence(inc.attack_sequence || '');
     try {
-      const res = await fetch(`${API}/api/timeline/incident/${inc.incident_id}`);
-      if (res.ok) setTimeline(await res.json());
+      const [tlRes, detailRes] = await Promise.all([
+        fetch(`${API}/api/timeline/incident/${inc.incident_id}`),
+        fetch(`${API}/api/incidents/${inc.incident_id}`),
+      ]);
+      if (tlRes.ok) setTimeline(await tlRes.json());
+      if (detailRes.ok) {
+        const detail = await detailRes.json();
+        setSelected((s: any) => ({ ...s, ...detail }));
+      }
     } catch (e) { console.error(e); }
   };
 
@@ -54,16 +91,25 @@ export const Investigations: React.FC = () => {
     }
   };
 
+  const wsColor = wsStatus === 'live' ? 'var(--teal)' : 'var(--text-muted)';
+
   return (
     <div className="main-content">
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>📋 Investigations</h1>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-          Security incidents with AI reasoning chains, evidence timelines, and MITRE ATT&CK mapping
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>📋 Investigations</h1>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
+            Real-time security incidents with AI reasoning chains, attack sequences, and MITRE ATT&CK mapping
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: wsColor, boxShadow: `0 0 6px ${wsColor}` }} />
+          <span style={{ fontSize: '0.72rem', color: wsColor, fontWeight: 600 }}>
+            {wsStatus === 'live' ? '● LIVE STREAM' : '○ OFFLINE'}
+          </span>
+        </div>
       </div>
 
-      {/* KPI Row */}
       <div className="grid-4" style={{ marginBottom: 16 }}>
         <div className="stat-card"><span className="stat-card__label">Total Incidents</span><span className="stat-card__value">{incidents.length}</span></div>
         <div className="stat-card"><span className="stat-card__label">Open</span><span className="stat-card__value" style={{ color: 'var(--critical)' }}>{incidents.filter(i => i.status === 'new').length}</span></div>
@@ -71,7 +117,6 @@ export const Investigations: React.FC = () => {
         <div className="stat-card"><span className="stat-card__label">Resolved</span><span className="stat-card__value" style={{ color: 'var(--teal)' }}>{incidents.filter(i => i.status === 'resolved').length}</span></div>
       </div>
 
-      {/* Incident List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {incidents.map((inc) => (
           <div
@@ -93,7 +138,6 @@ export const Investigations: React.FC = () => {
               </div>
             </div>
 
-            {/* MITRE Badges */}
             {inc.mitre_techniques && inc.mitre_techniques.length > 0 && (
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
                 {inc.mitre_techniques.map((t: string, i: number) => (
@@ -143,12 +187,11 @@ export const Investigations: React.FC = () => {
         ))}
         {incidents.length === 0 && (
           <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-            No investigations currently open. Start telemetry replay to generate incidents.
+            Waiting for real-time incidents... The system auto-streams attack scenarios on startup.
           </div>
         )}
       </div>
 
-      {/* Detail Modal */}
       {selected && (
         <div
           style={{ position: 'fixed', inset: 0, background: 'rgba(5,13,26,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
@@ -156,7 +199,7 @@ export const Investigations: React.FC = () => {
         >
           <div
             className="card"
-            style={{ width: 700, maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto' }}
+            style={{ width: 760, maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto' }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -166,7 +209,15 @@ export const Investigations: React.FC = () => {
 
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>{selected.summary}</p>
 
-            {/* AI Explanation */}
+            {(attackSequence || selected.attack_sequence) && (
+              <div style={{ background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--high)', marginBottom: 6, textTransform: 'uppercase' }}>⚔️ Attack Sequence</div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6, fontFamily: 'monospace' }}>
+                  {attackSequence || selected.attack_sequence}
+                </p>
+              </div>
+            )}
+
             {selected.ai_explanation && (
               <div style={{ background: 'rgba(99,110,240,0.08)', border: '1px solid rgba(99,110,240,0.2)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--indigo)', marginBottom: 6, textTransform: 'uppercase' }}>🤖 AI Analysis</div>
@@ -174,27 +225,25 @@ export const Investigations: React.FC = () => {
               </div>
             )}
 
-            {/* Recommendation */}
             {selected.recommendation && (
               <div style={{ background: 'rgba(0,229,176,0.08)', border: '1px solid rgba(0,229,176,0.2)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--teal)', marginBottom: 6, textTransform: 'uppercase' }}>💡 Recommendation</div>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{selected.recommendation}</p>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--teal)', marginBottom: 6, textTransform: 'uppercase' }}>💡 Recommended Actions</div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{selected.recommendation}</p>
               </div>
             )}
 
-            {/* Evidence Chain */}
             {selected.evidence_chain && selected.evidence_chain.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>Evidence Chain</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>🔍 Evidence Chain</div>
                 {selected.evidence_chain.map((e: string, i: number) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    <span style={{ color: 'var(--medium)' }}>→</span> {e}
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ color: 'var(--medium)', flexShrink: 0 }}>{i + 1}.</span>
+                    <span>{e}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* MITRE Mapping */}
             {selected.mitre_tactics && selected.mitre_tactics.length > 0 && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>MITRE ATT&CK Mapping</div>
@@ -209,7 +258,6 @@ export const Investigations: React.FC = () => {
               </div>
             )}
 
-            {/* Event Timeline */}
             {timeline && timeline.timeline && timeline.timeline.length > 0 && (
               <div style={{ marginBottom: 16 }}>
                 <AttackTimeline events={timeline.timeline} title="Attack Timeline" />

@@ -2,11 +2,8 @@ import asyncio
 import random
 import json
 from app.telemetry.scheduler import scheduler
-from app.services.event_store import store
 from app.models.event import SecurityEvent, generate_events
-from app.api.websocket import broadcast_event
-from app.agents.orchestrator import orchestrator
-from app.telemetry.anomaly_detector import anomaly_detector
+from app.telemetry.processor import process_telemetry_event
 
 
 class LiveDataGenerator:
@@ -33,19 +30,7 @@ async def live_loop():
 
         sec_event = await generator.generate_next_event()
 
-        await store.add(sec_event)
-
-        # Run anomaly detection
-        anomaly_result = anomaly_detector.ingest(sec_event)
-
-        # Trigger orchestrator
-        asyncio.create_task(orchestrator.process_event(sec_event))
-
-        # Broadcast structured event via WebSocket
-        event_data = sec_event.model_dump()
-        if anomaly_result["has_anomaly"]:
-            event_data["anomalies"] = anomaly_result["anomalies"]
-        await broadcast_event(event_data)
+        await process_telemetry_event(sec_event)
 
         scheduler.state.current_index += 1
 

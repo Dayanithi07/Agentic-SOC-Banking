@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { TelemetryEvent } from '../types';
 import { StatCard }        from '../components/StatCard';
 import { EventTimeline }   from '../components/EventTimeline';
@@ -6,9 +6,9 @@ import { TelemetryChart }  from '../components/TelemetryChart';
 import { AgentChat }       from '../components/AgentChat';
 import { RiskMeter }       from '../components/RiskMeter';
 import { EventDetail }     from '../components/EventDetail';
+import { useTelemetryWebSocket, API_BASE } from '../hooks/useTelemetryWebSocket';
 
-const WS_URL = 'ws://localhost:8000/ws/telemetry';
-const API = 'http://localhost:8000';
+const API = API_BASE;
 
 interface LiveStats {
   total_events: number;
@@ -20,27 +20,15 @@ interface LiveStats {
   severity_counts: Record<string, number>;
 }
 
-function mapRawToEvent(raw: any): TelemetryEvent | null {
-  if (!raw.event_type && !raw.event_id) return null;
-  return {
-    id: raw.event_id || raw.id || `ws-${Date.now()}`,
-    source: raw.source || 'unknown',
-    event_type: raw.event_type || 'unknown',
-    severity: raw.severity || 'info',
-    timestamp: raw.timestamp || new Date().toISOString(),
-    user: raw.user_id || raw.user,
-    description: raw.mitre_technique || raw.event_type || '',
-    risk_score: raw.risk_score ?? (raw.severity === 'critical' ? 90 : raw.severity === 'high' ? 70 : raw.severity === 'medium' ? 45 : 20),
-    ai_explanation: raw.mitre_tactic ? `${raw.mitre_tactic}: ${raw.mitre_technique || ''}` : undefined,
-    status: 'new',
-  };
+interface DashboardProps {
+  onNavigate?: (page: string) => void;
 }
 
-export const Dashboard: React.FC = () => {
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [events,   setEvents]   = useState<TelemetryEvent[]>([]);
   const [selected, setSelected] = useState<TelemetryEvent | null>(null);
   const [tab,      setTab]      = useState<'timeline' | 'chart'>('timeline');
-  const [wsStatus, setWsStatus] = useState<'connecting' | 'live' | 'offline'>('offline');
+  const [autoStreaming, setAutoStreaming] = useState(true);
 
   // Live stats from backend API
   const [stats, setStats] = useState<LiveStats>({
@@ -56,10 +44,24 @@ export const Dashboard: React.FC = () => {
   const [replaySpeed, setReplaySpeed]         = useState(10);
   const [replayProgress, setReplayProgress]   = useState({ current: 0, total: 0 });
 
-  const wsRef        = useRef<WebSocket | null>(null);
-  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mountedRef   = useRef(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const { status: wsStatus } = useTelemetryWebSocket({
+    onEvent: (ev) => setEvents(prev => [ev, ...prev].slice(0, 500)),
+    onStats: (s) => setStats(prev => ({
+      ...prev,
+      total_events: (s.total_events as number) ?? prev.total_events,
+      open_incidents: (s.open_incidents as number) ?? prev.open_incidents,
+      avg_risk_score: (s.avg_risk_score as number) ?? prev.avg_risk_score,
+    })),
+  });
+
+  useEffect(() => {
+    fetch(`${API}/api/replay/status`)
+      .then(r => r.json())
+      .then(r => setAutoStreaming(r.status === 'running'))
+      .catch(() => {});
+  }, []);
 
   // File upload handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,18 +98,17 @@ export const Dashboard: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  // ── Load initial events from backend API on mount ───────────────────
-  useEffect(() => {
-    fetch(`${API}/api/events?limit=50`)
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          const mapped = data.map(raw => mapRawToEvent(raw)).filter(Boolean) as TelemetryEvent[];
-          setEvents(mapped);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const handleClearData = async () => {
+    setEvents([]);
+    setStats({
+      total_events: 0, critical_alerts: 0, active_agents: 9,
+      open_incidents: 0, avg_risk_score: 0, events_last_hour: 0,
+      severity_counts: {}
+    });
+    try {
+      await fetch(`${API}/api/replay/clear-db`, { method: 'POST' });
+    } catch {}
+  };
 
   // ── Poll live stats from backend every 1s ────────────────────────────
   useEffect(() => {
@@ -130,8 +131,10 @@ export const Dashboard: React.FC = () => {
         }
         if (replayRes.ok) {
           const r = await replayRes.json();
-          if (r.status === 'running') setReplayStatus('running');
-          else if (r.status === 'paused') setReplayStatus('paused');
+          if (r.status === 'running') {
+            setReplayStatus('running');
+            setAutoStreaming(true);
+          } else if (r.status === 'paused') setReplayStatus('paused');
           else setReplayStatus('stopped');
           setReplayProgress({ current: r.current_index ?? 0, total: r.total_events ?? 0 });
         }
@@ -141,48 +144,6 @@ export const Dashboard: React.FC = () => {
     const iv = setInterval(poll, 1000);
     return () => clearInterval(iv);
   }, []);
-
-  // ── WebSocket ────────────────────────────────────────────────────────
-  const connect = useCallback(() => {
-    if (!mountedRef.current) return;
-    if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
-    if (wsRef.current) {
-      const prev = wsRef.current; wsRef.current = null;
-      if (prev.readyState < 2) prev.close();
-    }
-    try {
-      const ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
-      ws.onopen = () => { if (mountedRef.current && wsRef.current === ws) setWsStatus('live'); };
-      ws.onmessage = (msg) => {
-        if (!mountedRef.current || wsRef.current !== ws) return;
-        try {
-          const parsed = JSON.parse(msg.data);
-          const raw = parsed.type === 'event' ? parsed.data : parsed;
-          const ev = mapRawToEvent(raw);
-          if (ev) setEvents(prev => [ev, ...prev].slice(0, 500));
-        } catch {}
-      };
-      ws.onerror = () => { if (mountedRef.current && wsRef.current === ws) setWsStatus('offline'); };
-      ws.onclose = () => {
-        if (!mountedRef.current || wsRef.current !== ws) return;
-        setWsStatus('offline');
-        reconnectRef.current = setTimeout(() => { if (mountedRef.current) connect(); }, 5000);
-      };
-    } catch { setWsStatus('offline'); }
-  }, []);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    const t = setTimeout(connect, 300);
-    return () => {
-      mountedRef.current = false; clearTimeout(t);
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
-      const ws = wsRef.current;
-      if (ws && ws.readyState < 2) ws.close();
-      wsRef.current = null;
-    };
-  }, [connect]);
 
   // ── Replay actions ───────────────────────────────────────────────────
   const handleSelectScenario = async (filename: string) => {
@@ -196,6 +157,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleStart = async () => {
+    await handleClearData();
     await fetch(`${API}/api/replay/select-scenario`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: selectedScenario }),
@@ -238,7 +200,7 @@ export const Dashboard: React.FC = () => {
             Security Operations Center
           </h1>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
-            Real-time AI threat detection &bull; Feed log files to analyse attacks
+            Real-time AI threat detection &bull; {autoStreaming ? 'Auto-streaming all attack scenarios' : 'Manual log feed mode'}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -340,6 +302,16 @@ export const Dashboard: React.FC = () => {
               </button>
             )}
 
+            <button
+              className="btn btn--ghost"
+              style={{ fontSize: '0.78rem', padding: '6px 12px', color: 'var(--text-muted)' }}
+              onClick={handleClearData}
+              disabled={replayStatus === 'running'}
+              title="Reset all meters and clear event feed to 0"
+            >
+              🧹 Reset Data
+            </button>
+
             {/* Speed */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg-secondary)', borderRadius: 6, padding: '3px 8px', border: '1px solid var(--border)' }}>
               <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Speed:</span>
@@ -438,9 +410,9 @@ export const Dashboard: React.FC = () => {
           <div style={{ flex: 1, overflow: 'auto' }}>
             {events.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--text-muted)' }}>
-                <span style={{ fontSize: '2.5rem' }}>📁</span>
-                <span style={{ fontSize: '0.9rem' }}>No events yet</span>
-                <span style={{ fontSize: '0.75rem' }}>Select a scenario file above and click <strong>"Feed Log File"</strong> to begin analysis</span>
+                <span style={{ fontSize: '2.5rem' }}>{autoStreaming ? '🔄' : '📁'}</span>
+                <span style={{ fontSize: '0.9rem' }}>{autoStreaming ? 'Live stream active — events arriving...' : 'No events yet'}</span>
+                <span style={{ fontSize: '0.75rem' }}>{autoStreaming ? 'All attack scenarios cycle automatically on startup' : 'Select a scenario file above and click "Feed Log File"'}</span>
               </div>
             ) : tab === 'timeline'
               ? <EventTimeline events={events.slice(0, 50)} onSelect={setSelected} />
@@ -509,7 +481,16 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {selected && <EventDetail event={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <EventDetail
+          event={selected}
+          onClose={() => setSelected(null)}
+          onInvestigate={() => {
+            setSelected(null);
+            onNavigate?.('investigations');
+          }}
+        />
+      )}
     </div>
   );
 };

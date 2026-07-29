@@ -3,19 +3,13 @@ from pydantic import BaseModel
 from typing import Optional
 import datetime
 import asyncio
-from app.services.event_store import store
 from app.models.event import SecurityEvent
-from app.agents.orchestrator import orchestrator
-from app.api.websocket import broadcast_event
-from app.telemetry.anomaly_detector import anomaly_detector
+from app.telemetry.processor import process_telemetry_event
 
 router = APIRouter(prefix="/api", tags=["E-Commerce"])
 
 async def _process_and_broadcast(event: SecurityEvent):
-    await store.add(event)
-    anomaly_detector.ingest(event)
-    asyncio.create_task(orchestrator.process_event(event))
-    await broadcast_event(event.model_dump())
+    await process_telemetry_event(event)
 
 # Mock DB for e-commerce
 users_db = {"john.smith": "password123", "admin": "admin_pass"}

@@ -4,11 +4,8 @@ import asyncio
 from datetime import datetime
 from typing import List, Optional
 from app.telemetry.scheduler import scheduler
-from app.services.event_store import store
 from app.models.event import SecurityEvent
-from app.api.websocket import broadcast_event
-from app.agents.orchestrator import orchestrator
-from app.telemetry.anomaly_detector import anomaly_detector
+from app.telemetry.processor import process_telemetry_event
 
 SCENARIOS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/scenarios"))
 active_scenario_file: Optional[str] = "ecommerce_security_scenarios.jsonl"
@@ -124,20 +121,7 @@ async def file_replay_loop():
 
         current_evt = events[i]
 
-        # 1. Store in database
-        await store.add(current_evt)
-
-        # 2. Run anomaly detection
-        anomaly_result = anomaly_detector.ingest(current_evt)
-
-        # 3. Trigger orchestrator (AI agents)
-        await orchestrator.process_event(current_evt)
-
-        # 4. Broadcast event via WebSocket
-        event_data = current_evt.model_dump()
-        if anomaly_result["has_anomaly"]:
-            event_data["anomalies"] = anomaly_result["anomalies"]
-        await broadcast_event(event_data)
+        await process_telemetry_event(current_evt)
 
         scheduler.state.current_index = i + 1
 

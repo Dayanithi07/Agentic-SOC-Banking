@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from app.services.event_store import store
 from app.models.event import generate_events
+from app.telemetry.processor import process_telemetry_event
 from app.database.connection import async_session_maker
 from app.database.models import AgentRunDB
 from sqlalchemy import select, func, desc
@@ -31,11 +32,14 @@ class RunCycleResponse(BaseModel):
 async def run_detection_cycle():
     """Simulate a full AI agent detection cycle generating new telemetry events."""
     new_events = generate_events(5)
-    await store.add_many(new_events)
+    processed = []
+    for evt in new_events:
+        data = await process_telemetry_event(evt)
+        processed.append(data)
     stats = await store.stats()
     return RunCycleResponse(
-        message="Agent detection cycle complete. 5 new events analysed.",
-        events=[e.model_dump() for e in new_events],
+        message="Agent detection cycle complete. 5 new events analysed through full AI pipeline.",
+        events=processed,
         stats=stats,
     )
 

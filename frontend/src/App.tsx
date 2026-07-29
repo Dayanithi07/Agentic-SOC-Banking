@@ -2,23 +2,23 @@ import React, { useState, useCallback } from 'react';
 import { Sidebar }        from './components/Sidebar';
 import { Header }         from './components/Header';
 import { Dashboard }      from './pages/Dashboard';
-import { LiveAlerts }     from './pages/LiveAlerts';
 import { AIAgents }       from './pages/AIAgents';
-import { Analytics }      from './pages/Analytics';
-import { ThreatHunt }     from './pages/ThreatHunt';
 import { Investigations } from './pages/Investigations';
-import { Settings }       from './pages/Settings';
 import { Help }           from './pages/Help';
-import { Vulnerabilities } from './pages/Vulnerabilities';
 import { NetworkMap }      from './pages/NetworkMap';
 import { TargetStore }     from './pages/TargetStore';
-import { generateEvents, fetchRunCycle } from './hooks/useApi';
+import { fetchRunCycle }   from './hooks/useApi';
+import { useTelemetryWebSocket } from './hooks/useTelemetryWebSocket';
 import type { TelemetryEvent } from './types';
 
 export default function App() {
   const [page,    setPage]    = useState('dashboard');
-  const [events,  setEvents]  = useState<TelemetryEvent[]>(() => generateEvents(24));
+  const [events,  setEvents]  = useState<TelemetryEvent[]>([]);
   const [running, setRunning] = useState(false);
+
+  useTelemetryWebSocket({
+    onEvent: (ev) => setEvents(prev => [ev, ...prev].slice(0, 200)),
+  });
 
   const criticalCount = events.filter(e => e.severity === 'critical').length;
 
@@ -35,17 +35,12 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'dashboard':      return <Dashboard />;
-      case 'alerts':         return <LiveAlerts />;
-      case 'agents':         return <AIAgents />;
-      case 'analytics':      return <Analytics />;
-      case 'hunt':           return <ThreatHunt />;
+      case 'dashboard':      return <Dashboard onNavigate={(p) => setPage(p)} />;
       case 'investigations': return <Investigations />;
-      case 'settings':       return <Settings />;
-      case 'help':           return <Help />;
-      case 'vulnerabilities': return <Vulnerabilities />;
+      case 'agents':         return <AIAgents />;
       case 'network':         return <NetworkMap />;
       case 'store':           return <TargetStore />;
+      case 'help':           return <Help />;
       default:
         return (
           <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
