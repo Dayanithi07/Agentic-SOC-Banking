@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from app.api import health, events, agents, chat, websocket, ecommerce, replay, assessment, incidents
+from app.api import health, events, agents, chat, websocket, ecommerce, replay, assessment, incidents, analytics, timeline
 
 from contextlib import asynccontextmanager
 from app.database.connection import init_db
@@ -41,6 +41,8 @@ app.include_router(ecommerce.router)
 app.include_router(replay.router)
 app.include_router(assessment.router)
 app.include_router(incidents.router)
+app.include_router(analytics.router)
+app.include_router(timeline.router)
 
 @app.get("/", tags=["Root"])
 async def root():

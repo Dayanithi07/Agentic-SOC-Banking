@@ -57,7 +57,22 @@ export const Dashboard: React.FC = () => {
       ws.onmessage = (msg) => {
         if (!mountedRef.current || wsRef.current !== ws) return;
         try {
-          const ev = JSON.parse(msg.data) as TelemetryEvent;
+          const parsed = JSON.parse(msg.data);
+          // Handle structured message {type, data}
+          const raw = parsed.type === 'event' ? parsed.data : parsed;
+          if (!raw.event_type && !raw.event_id) return;
+          const ev: TelemetryEvent = {
+            id: raw.event_id || raw.id || `ws-${Date.now()}`,
+            source: raw.source || 'unknown',
+            event_type: raw.event_type || 'unknown',
+            severity: raw.severity || 'info',
+            timestamp: raw.timestamp || new Date().toISOString(),
+            user: raw.user_id || raw.user,
+            description: raw.mitre_technique || raw.event_type || '',
+            risk_score: raw.risk_score ?? (raw.severity === 'critical' ? 90 : raw.severity === 'high' ? 70 : raw.severity === 'medium' ? 45 : 20),
+            ai_explanation: raw.mitre_tactic ? `${raw.mitre_tactic}: ${raw.mitre_technique || ''}` : undefined,
+            status: 'new',
+          };
           setEvents(prev => [ev, ...prev].slice(0, 200));
         } catch { /* ignore malformed */ }
       };

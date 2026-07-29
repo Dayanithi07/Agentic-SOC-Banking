@@ -10,6 +10,7 @@ import { Investigations } from './pages/Investigations';
 import { Settings }       from './pages/Settings';
 import { Help }           from './pages/Help';
 import { Vulnerabilities } from './pages/Vulnerabilities';
+import { NetworkMap }      from './pages/NetworkMap';
 import { generateEvents, fetchRunCycle } from './hooks/useApi';
 import type { TelemetryEvent } from './types';
 
@@ -42,6 +43,7 @@ export default function App() {
       case 'settings':       return <Settings />;
       case 'help':           return <Help />;
       case 'vulnerabilities': return <Vulnerabilities />;
+      case 'network':         return <NetworkMap />;
       default:
         return (
           <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>

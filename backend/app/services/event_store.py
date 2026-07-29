@@ -22,6 +22,8 @@ class EventStore:
                 status=event.status,
                 severity=event.severity,
                 correlation_id=event.correlation_id,
+                mitre_tactic=event.mitre_tactic,
+                mitre_technique=event.mitre_technique,
                 metadata_=event.metadata
             )
             session.add(db_event)
@@ -45,6 +47,8 @@ class EventStore:
                     status=e.status,
                     severity=e.severity,
                     correlation_id=e.correlation_id,
+                    mitre_tactic=e.mitre_tactic,
+                    mitre_technique=e.mitre_technique,
                     metadata_=e.metadata
                 ) for e in events
             ]
@@ -73,6 +77,8 @@ class EventStore:
                     status=e.status,
                     severity=e.severity,
                     correlation_id=e.correlation_id,
+                    mitre_tactic=e.mitre_tactic,
+                    mitre_technique=e.mitre_technique,
                     metadata=e.metadata_ or {}
                 ) for e in db_events
             ]
@@ -99,6 +105,8 @@ class EventStore:
                     status=e.status,
                     severity=e.severity,
                     correlation_id=e.correlation_id,
+                    mitre_tactic=e.mitre_tactic,
+                    mitre_technique=e.mitre_technique,
                     metadata=e.metadata_ or {}
                 ) for e in db_events
             ]
@@ -118,7 +126,7 @@ class EventStore:
             return {
                 "total_events": total,
                 "critical_alerts": crit,
-                "active_agents": 3,  # Assessment, Investigation, Coordinator
+                "active_agents": 9,  # All specialized agents
                 "threats_resolved": 0,
                 "avg_risk_score": 0,  # Will compute later or fetch from Findings
                 "events_last_hour": 0,

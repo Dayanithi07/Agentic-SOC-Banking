@@ -2,6 +2,7 @@ import uuid
 import datetime
 from collections import defaultdict
 import asyncio
+from app.api.websocket import broadcast_incident, broadcast_agent_activity
 from app.models.event import SecurityEvent
 from app.models.finding import Finding
 from app.models.incident import Incident
@@ -95,6 +96,7 @@ class Orchestrator:
             result = await agent_func(events)
             dump = result.model_dump() if result else {}
             await self._log_agent_run(agent_name, trigger_id, dump)
+            await broadcast_agent_activity(agent_name, trigger_id, dump)
             return dump
         except Exception as e:
             print(f"Error running {agent_name}: {e}")
@@ -143,6 +145,12 @@ class Orchestrator:
                 )
                 session.add(inc)
                 await session.commit()
-                # Broadcast incident here in future steps
+                await broadcast_incident({
+                    "incident_id": inc.incident_id,
+                    "title": inc.title,
+                    "risk_score": ctx_risk,
+                    "status": "new",
+                    "mitre_tactics": tactics,
+                })
 
 orchestrator = Orchestrator()

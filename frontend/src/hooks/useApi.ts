@@ -63,7 +63,7 @@ export function generateStats(events: TelemetryEvent[]): DashboardStats {
   return {
     total_events:     total,
     critical_alerts:  events.filter(e => e.severity === 'critical').length,
-    active_agents:    6,
+    active_agents:    9,
     threats_resolved: Math.floor(total * 0.35),
     avg_risk_score:   total ? Math.round(events.reduce((s, e) => s + e.risk_score, 0) / total) : 0,
     events_last_hour: events.filter(e => Date.now() - new Date(e.timestamp).getTime() < 3_600_000).length,
@@ -72,8 +72,23 @@ export function generateStats(events: TelemetryEvent[]): DashboardStats {
 
 export async function fetchRunCycle(): Promise<{ events: TelemetryEvent[]; message: string }> {
   try {
-    const res = await fetch('/api/run-cycle', { method: 'POST' });
-    if (res.ok) return await res.json();
+    const res = await fetch('http://localhost:8000/api/run-cycle', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      const mapped = (data.events || []).map((raw: any) => ({
+        id: raw.event_id || raw.id,
+        source: raw.source || 'unknown',
+        event_type: raw.event_type || 'unknown',
+        severity: raw.severity || 'info',
+        timestamp: raw.timestamp || new Date().toISOString(),
+        user: raw.user_id || raw.user,
+        description: raw.mitre_technique || raw.event_type || '',
+        risk_score: raw.risk_score ?? 30,
+        ai_explanation: raw.mitre_tactic ? `${raw.mitre_tactic}: ${raw.mitre_technique || ''}` : undefined,
+        status: 'new' as const,
+      }));
+      return { events: mapped, message: data.message };
+    }
   } catch { /* fall through to mock */ }
   await new Promise(r => setTimeout(r, 800));
   return { events: generateEvents(5), message: 'Agent cycle complete (demo mode)' };
@@ -84,7 +99,7 @@ export async function chatWithAgent(
   userInput: string,
 ): Promise<string> {
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetch('http://localhost:8000/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: userInput }),
@@ -95,9 +110,9 @@ export async function chatWithAgent(
   const q = userInput.toLowerCase();
   if (q.includes('critical'))   return 'Current critical alerts require immediate attention. Top priority: MFA bypass attempts from Azure AD and lateral movement across subnets. Recommend immediate account lockout.';
   if (q.includes('risk'))       return 'Average risk score is elevated at 74/100. Primary contributors: Lateral Movement events (avg 91) and MFA Bypass attempts (avg 87). Recommend activating incident response.';
-  if (q.includes('agent'))      return 'All 6 AI agents are active: IAM, EDR, Network, Firewall, PAM, and Coordinator. Network Agent is currently busy analysing subnet traffic. Zero errors in the last cycle.';
+  if (q.includes('agent'))      return 'All 9 AI agents are active: IAM, EDR, Network, Database, Threat Intel, Policy, Coordinator, Assessment, and Investigation. Zero errors in the last cycle.';
   if (q.includes('recommend'))  return 'Recommendations: 1) Enforce MFA on all admin accounts. 2) Block suspicious IPs at Palo Alto. 3) Rotate compromised service account credentials. 4) Enable anomaly alerting on high-value transfers.';
-  if (q.includes('status'))     return 'SOC operational. 6 agents active, 4 data sources streaming, 0 system errors. Last detection cycle completed 32 seconds ago. 3 open investigations in progress.';
+  if (q.includes('status'))     return 'SOC operational. 9 agents active, 6 data sources streaming, 0 system errors. Last detection cycle completed 32 seconds ago.';
   return 'SOC Copilot is monitoring 6 security data sources in real time. I can help with threat analysis, risk assessment, agent status, and remediation recommendations. What would you like to know?';
 }
 
@@ -119,7 +134,21 @@ export function useWebSocketStream(
       ws = new WebSocket(WS_URL);
       ws.onmessage = (msg) => {
         try {
-          const event = JSON.parse(msg.data) as TelemetryEvent;
+          const parsed = JSON.parse(msg.data);
+          const raw = parsed.type === 'event' ? parsed.data : parsed;
+          if (!raw.event_type && !raw.event_id) return;
+          const event: TelemetryEvent = {
+            id: raw.event_id || raw.id || `ws-${Date.now()}`,
+            source: raw.source || 'unknown',
+            event_type: raw.event_type || 'unknown',
+            severity: raw.severity || 'info',
+            timestamp: raw.timestamp || new Date().toISOString(),
+            user: raw.user_id || raw.user,
+            description: raw.mitre_technique || raw.event_type || '',
+            risk_score: raw.risk_score ?? 30,
+            ai_explanation: raw.mitre_tactic ? `${raw.mitre_tactic}: ${raw.mitre_technique || ''}` : undefined,
+            status: 'new',
+          };
           onEvent(event);
         } catch { /* ignore malformed */ }
       };

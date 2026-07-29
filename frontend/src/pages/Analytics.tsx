@@ -1,17 +1,7 @@
-import React, { useState } from 'react';
-import { generateEvents } from '../hooks/useApi';
+import React, { useState, useEffect } from 'react';
+import { MitreMatrix } from '../components/MitreMatrix';
 
-const events = generateEvents(100);
-
-function countBy<K extends string>(arr: typeof events, key: (e: typeof events[0]) => K): Record<string, number> {
-  const out: Record<string, number> = {};
-  arr.forEach(e => { const k = key(e); out[k] = (out[k] ?? 0) + 1; });
-  return out;
-}
-
-const bySev    = countBy(events, e => e.severity);
-const bySource = countBy(events, e => e.source);
-const byType   = countBy(events, e => e.event_type);
+const API = 'http://localhost:8000';
 
 const SEV_COLORS: Record<string, string> = {
   critical: 'var(--critical)', high: 'var(--high)',
@@ -26,115 +16,151 @@ function HBar({ label, count, max, color }: { label: string; count: number; max:
       <div style={{ flex: 1, height: 8, background: 'var(--bg-secondary)', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${(count / max) * 100}%`, background: color, borderRadius: 4, transition: 'width 0.8s ease', boxShadow: `0 0 8px ${color}60` }} />
       </div>
-      <span style={{ fontSize: '0.78rem', fontWeight: 600, color, width: 28, textAlign: 'right', flexShrink: 0 }}>{count}</span>
+      <span style={{ fontSize: '0.78rem', fontWeight: 600, color, width: 36, textAlign: 'right', flexShrink: 0 }}>{count}</span>
     </div>
   );
 }
 
 export const Analytics: React.FC = () => {
-  const avgRisk = Math.round(events.reduce((s, e) => s + e.risk_score, 0) / events.length);
-  const critPct = Math.round((bySev['critical'] ?? 0) / events.length * 100);
+  const [overview, setOverview] = useState<any>(null);
+  const [trend, setTrend] = useState<any[]>([]);
+  const [topUsers, setTopUsers] = useState<any[]>([]);
+  const [topEndpoints, setTopEndpoints] = useState<any[]>([]);
+  const [mitre, setMitre] = useState<any[]>([]);
+  const [sources, setSources] = useState<any[]>([]);
 
-  // Hourly distribution (last 12h)
-  const hours = Array.from({ length: 12 }, (_, i) => {
-    const h = new Date(); h.setHours(h.getHours() - (11 - i), 0, 0, 0);
-    const hr = h.getHours();
-    return { label: h.toLocaleTimeString('en-IN', { hour: '2-digit' }), count: events.filter(e => new Date(e.timestamp).getHours() === hr).length };
-  });
-  const maxH = Math.max(1, ...hours.map(h => h.count));
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [ovRes, trRes, usRes, epRes, mtRes, srcRes] = await Promise.all([
+          fetch(`${API}/api/analytics/overview`),
+          fetch(`${API}/api/analytics/severity-trend`),
+          fetch(`${API}/api/analytics/top-users`),
+          fetch(`${API}/api/analytics/top-endpoints`),
+          fetch(`${API}/api/analytics/mitre-coverage`),
+          fetch(`${API}/api/analytics/event-sources`),
+        ]);
+        if (ovRes.ok) setOverview(await ovRes.json());
+        if (trRes.ok) setTrend(await trRes.json());
+        if (usRes.ok) setTopUsers(await usRes.json());
+        if (epRes.ok) setTopEndpoints(await epRes.json());
+        if (mtRes.ok) setMitre(await mtRes.json());
+        if (srcRes.ok) setSources(await srcRes.json());
+      } catch (e) { console.error(e); }
+    };
+    load();
+    const interval = setInterval(load, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const maxSrc  = Math.max(1, ...Object.values(bySource));
-  const maxType = Math.max(1, ...Object.values(byType));
+  const sevCounts = overview?.severity_counts || {};
+  const maxSev = Math.max(1, ...Object.values(sevCounts).map(Number));
+  const maxSrc = Math.max(1, ...sources.map((s: any) => s.count));
+  const maxEp = Math.max(1, ...topEndpoints.map((e: any) => e.event_count));
+  const maxUsr = Math.max(1, ...topUsers.map((u: any) => u.event_count));
+
+  // Build hourly trend bars
+  const trendMax = Math.max(1, ...trend.map((t: any) => (t.critical || 0) + (t.high || 0) + (t.medium || 0) + (t.low || 0) + (t.info || 0)));
 
   return (
     <div className="main-content">
       <div style={{ marginBottom: 4 }}>
         <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>📊 Security Analytics</h1>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-          Threat intelligence and trend analysis across all security data sources
+          Real-time threat intelligence from database — auto-refreshes every 8 seconds
         </p>
       </div>
 
       {/* KPI Row */}
       <div className="grid-4">
-        <div className="stat-card"><span className="stat-card__label">Events Analysed</span><span className="stat-card__value">{events.length}</span><span className="stat-card__sub">Last 24 hours</span></div>
-        <div className="stat-card"><span className="stat-card__label">Avg Risk Score</span><span className="stat-card__value" style={{ color: avgRisk >= 70 ? 'var(--critical)' : avgRisk >= 50 ? 'var(--high)' : 'var(--medium)' }}>{avgRisk}</span><span className="stat-card__sub">/ 100</span></div>
-        <div className="stat-card"><span className="stat-card__label">Critical Rate</span><span className="stat-card__value" style={{ color: 'var(--critical)' }}>{critPct}%</span><span className="stat-card__sub">Of all events</span></div>
-        <div className="stat-card"><span className="stat-card__label">Data Sources</span><span className="stat-card__value" style={{ color: 'var(--teal)' }}>{Object.keys(bySource).length}</span><span className="stat-card__sub">Active connectors</span></div>
+        <div className="stat-card"><span className="stat-card__label">Events Analysed</span><span className="stat-card__value">{overview?.total_events ?? '—'}</span><span className="stat-card__sub">All time</span></div>
+        <div className="stat-card"><span className="stat-card__label">Avg Risk Score</span><span className="stat-card__value" style={{ color: (overview?.avg_risk_score ?? 0) >= 70 ? 'var(--critical)' : 'var(--medium)' }}>{overview?.avg_risk_score ?? '—'}</span><span className="stat-card__sub">/ 100</span></div>
+        <div className="stat-card"><span className="stat-card__label">Open Incidents</span><span className="stat-card__value" style={{ color: 'var(--critical)' }}>{overview?.open_incidents ?? '—'}</span><span className="stat-card__sub">Require attention</span></div>
+        <div className="stat-card"><span className="stat-card__label">Agent Runs</span><span className="stat-card__value" style={{ color: 'var(--teal)' }}>{overview?.total_agent_runs ?? '—'}</span><span className="stat-card__sub">Total processed</span></div>
       </div>
 
       <div className="grid-2">
-        {/* Hourly Trend Chart */}
+        {/* Severity Trend */}
         <div className="card">
-          <div className="section-head"><h2>Event Volume (12-Hour Trend)</h2></div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 140, padding: '0 4px' }}>
-            {hours.map((h, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
-                <div
-                  style={{
+          <div className="section-head"><h2>Severity Trend (Hourly)</h2></div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 140, padding: '0 4px' }}>
+            {trend.slice(-12).map((t: any, i: number) => {
+              const total = (t.critical || 0) + (t.high || 0) + (t.medium || 0) + (t.low || 0) + (t.info || 0);
+              return (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, height: '100%', justifyContent: 'flex-end' }} title={`${t.hour}: ${total} events`}>
+                  <div style={{
                     width: '80%', borderRadius: '3px 3px 0 0',
                     background: 'linear-gradient(180deg, var(--cyan), var(--indigo))',
-                    height: `${Math.max((h.count / maxH) * 120, h.count > 0 ? 6 : 2)}px`,
+                    height: `${Math.max((total / trendMax) * 120, total > 0 ? 6 : 2)}px`,
                     transition: 'height 0.6s ease',
-                    boxShadow: h.count > 0 ? '0 0 8px var(--cyan-glow)' : 'none',
-                  }}
-                />
-                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>{h.label}</span>
-              </div>
-            ))}
+                    boxShadow: total > 0 ? '0 0 8px var(--cyan-glow)' : 'none',
+                  }} />
+                  <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>{(t.hour || '').slice(-5)}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Severity Donut-style */}
+        {/* Severity Distribution */}
         <div className="card">
           <div className="section-head"><h2>Severity Distribution</h2></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {(['critical', 'high', 'medium', 'low'] as const).map(s => (
-              <HBar key={s} label={s.charAt(0).toUpperCase() + s.slice(1)} count={bySev[s] ?? 0} max={events.length} color={SEV_COLORS[s]} />
+            {(['critical', 'high', 'medium', 'low', 'info'] as const).map(s => (
+              <HBar key={s} label={s.charAt(0).toUpperCase() + s.slice(1)} count={sevCounts[s] ?? 0} max={maxSev} color={SEV_COLORS[s]} />
             ))}
           </div>
         </div>
       </div>
 
       <div className="grid-2">
-        {/* By Source */}
+        {/* Event Sources */}
         <div className="card">
           <div className="section-head"><h2>Events by Source</h2></div>
-          {Object.entries(bySource).sort((a, b) => b[1] - a[1]).map(([src, cnt], i) => (
-            <HBar key={src} label={src} count={cnt} max={maxSrc} color={PALETTE[i % PALETTE.length]} />
+          {sources.map((s: any, i: number) => (
+            <HBar key={s.source} label={s.source} count={s.count} max={maxSrc} color={PALETTE[i % PALETTE.length]} />
           ))}
+          {sources.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '1rem' }}>No data yet</div>}
         </div>
 
-        {/* By Type */}
+        {/* Top Endpoints */}
         <div className="card">
-          <div className="section-head"><h2>Top Threat Types</h2></div>
-          {Object.entries(byType).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t, cnt], i) => (
-            <HBar key={t} label={t} count={cnt} max={maxType} color={PALETTE[i % PALETTE.length]} />
+          <div className="section-head"><h2>Top Targeted Endpoints</h2></div>
+          {topEndpoints.map((ep: any, i: number) => (
+            <HBar key={ep.endpoint} label={ep.endpoint} count={ep.event_count} max={maxEp} color={PALETTE[i % PALETTE.length]} />
           ))}
+          {topEndpoints.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '1rem' }}>No data yet</div>}
         </div>
       </div>
 
-      {/* Risk Score Distribution */}
-      <div className="card">
-        <div className="section-head"><h2>Risk Score Distribution</h2></div>
-        <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 80 }}>
-          {Array.from({ length: 20 }, (_, i) => {
-            const lo = i * 5, hi = lo + 5;
-            const cnt = events.filter(e => e.risk_score >= lo && e.risk_score < hi).length;
-            const maxCnt = Math.max(1, ...Array.from({ length: 20 }, (_, j) => events.filter(e => e.risk_score >= j * 5 && e.risk_score < j * 5 + 5).length));
-            const col = lo >= 80 ? 'var(--critical)' : lo >= 60 ? 'var(--high)' : lo >= 40 ? 'var(--medium)' : 'var(--low)';
-            return (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, height: '100%', justifyContent: 'flex-end' }} title={`${lo}-${hi}: ${cnt} events`}>
-                <div style={{ width: '80%', height: `${Math.max((cnt / maxCnt) * 70, cnt > 0 ? 4 : 1)}px`, background: col, borderRadius: '2px 2px 0 0', transition: 'height 0.6s ease' }} />
-                {i % 4 === 0 && <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>{lo}</span>}
-              </div>
-            );
-          })}
+      <div className="grid-2">
+        {/* Top Users */}
+        <div className="card">
+          <div className="section-head"><h2>Most Active Users</h2></div>
+          {topUsers.map((u: any, i: number) => (
+            <HBar key={u.user_id} label={u.user_id} count={u.event_count} max={maxUsr} color={PALETTE[i % PALETTE.length]} />
+          ))}
+          {topUsers.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '1rem' }}>No data yet</div>}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>
-          <span>Low Risk (0-40)</span><span>Medium (40-60)</span><span>High (60-80)</span><span>Critical (80-100)</span>
+
+        {/* Placeholder for Risk Distribution */}
+        <div className="card">
+          <div className="section-head"><h2>Incident Status Overview</h2></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 0' }}>
+            <HBar label="Total Incidents" count={overview?.total_incidents ?? 0} max={Math.max(1, overview?.total_incidents ?? 1)} color="var(--cyan)" />
+            <HBar label="Open" count={overview?.open_incidents ?? 0} max={Math.max(1, overview?.total_incidents ?? 1)} color="var(--critical)" />
+            <HBar label="Resolved" count={(overview?.total_incidents ?? 0) - (overview?.open_incidents ?? 0)} max={Math.max(1, overview?.total_incidents ?? 1)} color="var(--teal)" />
+          </div>
         </div>
+      </div>
+
+      {/* MITRE ATT&CK Coverage */}
+      <div className="card" style={{ marginTop: 0 }}>
+        <div className="section-head"><h2>MITRE ATT&CK Coverage</h2></div>
+        <MitreMatrix data={mitre} />
       </div>
     </div>
   );
 };
+
+export default Analytics;

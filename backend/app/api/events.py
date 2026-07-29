@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Query
 from app.services.event_store import store
-from app.models.event import TelemetryEvent
+from app.models.event import SecurityEvent
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
-@router.get("", response_model=list[TelemetryEvent])
+@router.get("", response_model=list[SecurityEvent])
 async def get_events(
     limit: int = Query(50, ge=1, le=200),
     severity: str | None = Query(None),
