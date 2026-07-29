@@ -1,0 +1,5 @@
+{"timestamp":"2026-07-29T10:00:00Z","event_type":"login_failure","user_id":"john.smith","ip_address":"10.0.0.10","endpoint":"/api/auth/login","severity":"low"}
+{"timestamp":"2026-07-29T10:00:01Z","event_type":"login_failure","user_id":"admin","ip_address":"10.0.0.10","endpoint":"/api/auth/login","severity":"medium"}
+{"timestamp":"2026-07-29T10:00:02Z","event_type":"login_success","user_id":"john.smith","ip_address":"10.0.0.10","endpoint":"/api/auth/login","severity":"info"}
+{"timestamp":"2026-07-29T10:00:05Z","event_type":"api_request","user_id":"john.smith","ip_address":"10.0.0.10","endpoint":"/api/orders","severity":"info"}
+{"timestamp":"2026-07-29T10:00:10Z","event_type":"access_control_violation","user_id":"john.smith","ip_address":"10.0.0.10","endpoint":"/api/orders/ORD-2","severity":"critical","metadata":{"attempted_access":"admin"}}

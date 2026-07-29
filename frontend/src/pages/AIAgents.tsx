@@ -16,40 +16,22 @@ interface Agent {
 
 const AGENTS: Agent[] = [
   {
-    id: '1', name: 'SOC Coordinator', role: 'Orchestrator', icon: '🧠', status: 'active',
-    source: 'Internal', eventsProcessed: 1842, lastRun: '12s ago', avgResponseMs: 230,
-    capabilities: ['Multi-agent orchestration', 'Alert prioritisation', 'Incident escalation', 'AI explanation generation'],
-    description: 'Central coordinator that manages all sub-agents, aggregates findings, and generates executive-level risk summaries using Gemini AI.',
+    id: '1', name: 'Assessment Agent', role: 'Vulnerability Analysis', icon: '🛡️', status: 'active',
+    source: 'Application Scanner', eventsProcessed: 12, lastRun: '1m ago', avgResponseMs: 1500,
+    capabilities: ['Static finding analysis', 'Vulnerability contextualization', 'Exploitability assessment'],
+    description: 'Analyzes application assessment results and identifies security weaknesses.',
   },
   {
-    id: '2', name: 'IAM Agent', role: 'Identity & Access Management', icon: '🔑', status: 'active',
-    source: 'Azure AD / Okta', eventsProcessed: 543, lastRun: '45s ago', avgResponseMs: 180,
-    capabilities: ['Login anomaly detection', 'MFA bypass detection', 'Privilege escalation alerts', 'Account compromise scoring'],
-    description: 'Monitors identity events from Azure AD and Okta. Detects credential stuffing, brute force, MFA abuse, and suspicious authentication patterns.',
+    id: '2', name: 'Investigation Agent', role: 'Runtime Correlation', icon: '🕵️', status: 'idle',
+    source: 'Telemetry Replay', eventsProcessed: 4, lastRun: '5m ago', avgResponseMs: 3200,
+    capabilities: ['Event correlation', 'Timeline analysis', 'Incident synthesis', 'Evidence extraction'],
+    description: 'Investigates suspicious runtime behavior by correlating related security events and static findings.',
   },
   {
-    id: '3', name: 'EDR Agent', role: 'Endpoint Detection & Response', icon: '💻', status: 'active',
-    source: 'CrowdStrike / SentinelOne', eventsProcessed: 329, lastRun: '1m ago', avgResponseMs: 210,
-    capabilities: ['Malware detection', 'Lateral movement tracking', 'Process injection alerts', 'Endpoint quarantine triggers'],
-    description: 'Analyses endpoint telemetry from CrowdStrike and SentinelOne to detect malware, ransomware, lateral movement, and process injection attacks.',
-  },
-  {
-    id: '4', name: 'Network Agent', role: 'Network Monitoring', icon: '🌐', status: 'busy',
-    source: 'Palo Alto NGFW', eventsProcessed: 2104, lastRun: 'Now', avgResponseMs: 95,
-    capabilities: ['Traffic anomaly detection', 'C2 communication alerts', 'DDoS pattern recognition', 'Port scan detection'],
-    description: 'Continuously monitors network flows from Palo Alto NGFW. Currently analysing elevated east-west traffic between internal subnets.',
-  },
-  {
-    id: '5', name: 'Firewall Agent', role: 'Perimeter Security', icon: '🛡️', status: 'idle',
-    source: 'Palo Alto / Cisco', eventsProcessed: 891, lastRun: '5m ago', avgResponseMs: 140,
-    capabilities: ['Inbound threat blocking', 'Policy violation detection', 'Geo-blocking rules', 'Rule conflict analysis'],
-    description: 'Analyses perimeter firewall logs from Palo Alto and Cisco ASA. Detects policy violations, unauthorised access attempts, and rule misconfiguration.',
-  },
-  {
-    id: '6', name: 'PAM Agent', role: 'Privileged Access Management', icon: '🔐', status: 'active',
-    source: 'Cisco Duo / CyberArk', eventsProcessed: 217, lastRun: '2m ago', avgResponseMs: 195,
-    capabilities: ['Privileged session monitoring', 'Admin command auditing', 'Vault access tracking', 'Just-in-time access analysis'],
-    description: 'Monitors privileged account usage through Cisco Duo MFA and CyberArk vault sessions. Detects unauthorized admin commands and vault access anomalies.',
+    id: '3', name: 'Coordinator Agent', role: 'Orchestrator', icon: '🧠', status: 'active',
+    source: 'Internal pipeline', eventsProcessed: 154, lastRun: '2s ago', avgResponseMs: 450,
+    capabilities: ['Agent routing', 'Decision making', 'Result aggregation'],
+    description: 'Main controller that receives telemetry, determines if processing is required, and invokes the appropriate sub-agent.',
   },
 ];
 
@@ -68,20 +50,18 @@ export const AIAgents: React.FC = () => {
       <div style={{ marginBottom: 4 }}>
         <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>🤖 AI Agents</h1>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-          Autonomous security agents monitoring your banking infrastructure 24/7
+          SOCShield Autonomous security agents monitoring the E-Commerce platform
         </p>
       </div>
 
-      {/* Summary Bar */}
       <div className="grid-4">
-        <div className="stat-card"><span className="stat-card__label">Total Agents</span><span className="stat-card__value">6</span></div>
+        <div className="stat-card"><span className="stat-card__label">Total Agents</span><span className="stat-card__value">3</span></div>
         <div className="stat-card"><span className="stat-card__label">Active</span><span className="stat-card__value" style={{ color: 'var(--teal)' }}>{AGENTS.filter(a => a.status === 'active').length}</span></div>
-        <div className="stat-card"><span className="stat-card__label">Busy</span><span className="stat-card__value" style={{ color: 'var(--medium)' }}>{AGENTS.filter(a => a.status === 'busy').length}</span></div>
-        <div className="stat-card"><span className="stat-card__label">Events Today</span><span className="stat-card__value">{AGENTS.reduce((s, a) => s + a.eventsProcessed, 0).toLocaleString()}</span></div>
+        <div className="stat-card"><span className="stat-card__label">Findings Generated</span><span className="stat-card__value" style={{ color: 'var(--medium)' }}>2</span></div>
+        <div className="stat-card"><span className="stat-card__label">Investigations</span><span className="stat-card__value">1</span></div>
       </div>
 
-      {/* Agent Cards Grid */}
-      <div className="grid-3">
+      <div className="grid-3" style={{ marginTop: '1rem' }}>
         {AGENTS.map((agent, i) => {
           const ss = STATUS_STYLE[agent.status];
           return (
@@ -137,7 +117,6 @@ export const AIAgents: React.FC = () => {
         })}
       </div>
 
-      {/* Agent Detail Modal */}
       {selected && (
         <div
           style={{ position: 'fixed', inset: 0, background: 'rgba(5,13,26,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
@@ -191,7 +170,7 @@ export const AIAgents: React.FC = () => {
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn--ghost" onClick={() => setSelected(null)}>Close</button>
-              <button className="btn btn--primary">Force Run Agent</button>
+              <button className="btn btn--primary">View Logs</button>
             </div>
           </div>
         </div>
@@ -199,3 +178,5 @@ export const AIAgents: React.FC = () => {
     </div>
   );
 };
+
+export default AIAgents;

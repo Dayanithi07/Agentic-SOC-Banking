@@ -1,15 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-interface ConnectorStatus { name: string; icon: string; connected: boolean; lastSync: string; eventsToday: number; }
-
-const CONNECTORS: ConnectorStatus[] = [
-  { name: 'Azure AD',      icon: '☁️',  connected: true,  lastSync: '12s ago', eventsToday: 543  },
-  { name: 'CrowdStrike',   icon: '🦅',  connected: true,  lastSync: '45s ago', eventsToday: 329  },
-  { name: 'SentinelOne',   icon: '🛡️', connected: false, lastSync: '2h ago',  eventsToday: 0    },
-  { name: 'Palo Alto NGFW',icon: '🌐',  connected: true,  lastSync: '5s ago',  eventsToday: 2104 },
-  { name: 'Cisco Duo',     icon: '🔐',  connected: true,  lastSync: '1m ago',  eventsToday: 217  },
-  { name: 'Okta',          icon: '🔑',  connected: true,  lastSync: '30s ago', eventsToday: 891  },
-];
 
 export const Settings: React.FC = () => {
   const [geminiKey, setGeminiKey]   = useState('sk-••••••••••••••••••••••••••');
@@ -18,6 +8,32 @@ export const Settings: React.FC = () => {
   const [emailAlert, setEmailAlert] = useState(true);
   const [slackHook, setSlackHook]   = useState('https://hooks.slack.com/services/•••/•••');
   const [saved, setSaved]           = useState(false);
+
+  const [replayState, setReplayState] = useState({ status: 'stopped', speed: 10, progress: 0 });
+
+  useEffect(() => {
+    const fetchReplay = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/replay/status');
+        if (res.ok) {
+            const data = await res.json();
+            setReplayState(data);
+        }
+      } catch(e) {}
+    };
+    fetchReplay();
+    const interval = setInterval(fetchReplay, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleReplayAction = async (action: string) => {
+    await fetch(`http://localhost:8000/api/replay/${action}`, { method: 'POST' });
+    const res = await fetch('http://localhost:8000/api/replay/status');
+    if (res.ok) {
+        const data = await res.json();
+        setReplayState(data);
+    }
+  };
 
   const save = () => {
     setSaved(true);
@@ -50,42 +66,48 @@ export const Settings: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <div>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>⚙️ Settings</h1>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>Configure connectors, AI settings, and alert thresholds</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>Configure E-commerce telemetry, AI settings, and alert thresholds</p>
         </div>
         <button className="btn btn--primary" onClick={save}>
           {saved ? '✓ Saved!' : 'Save Changes'}
         </button>
       </div>
 
-      {/* Connectors */}
+      {/* Telemetry Replay */}
       <div className="card">
-        <div className="section-head"><h2>Security Connectors</h2></div>
-        <div className="grid-3">
-          {CONNECTORS.map(c => (
-            <div key={c.name} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '12px 16px', border: `1px solid ${c.connected ? 'rgba(0,229,176,0.2)' : 'rgba(255,59,107,0.2)'}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontSize: '1.2rem' }}>{c.icon}</span>
-                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{c.name}</span>
-                </div>
-                <span style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: 999, background: c.connected ? 'rgba(0,229,176,0.1)' : 'rgba(255,59,107,0.1)', color: c.connected ? 'var(--teal)' : 'var(--critical)', fontWeight: 600 }}>
-                  {c.connected ? 'ONLINE' : 'OFFLINE'}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Last sync: {c.lastSync}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Events today: {c.eventsToday.toLocaleString()}</div>
-              <button
-                className={`btn ${c.connected ? 'btn--ghost' : 'btn--primary'}`}
-                style={{ fontSize: '0.72rem', padding: '4px 10px', marginTop: 8, width: '100%' }}
-              >
-                {c.connected ? 'Configure' : 'Connect'}
-              </button>
+        <div className="section-head"><h2>Telemetry Replay</h2></div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '16px', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Dataset</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>ecommerce_security_scenarios.jsonl</div>
             </div>
-          ))}
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Status</div>
+              <div style={{ fontSize: '0.72rem', color: replayState.status === 'running' ? 'var(--teal)' : 'var(--text-muted)' }}>
+                {replayState.status === 'running' ? '● Running' : replayState.status}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Speed</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{replayState.speed}×</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Progress</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{replayState.progress}%</div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button className="btn btn--primary" onClick={() => handleReplayAction('start')}>Start</button>
+            <button className="btn btn--ghost" onClick={() => handleReplayAction('pause')}>Pause</button>
+            <button className="btn btn--ghost" onClick={() => handleReplayAction('stop')}>Stop</button>
+            <button className="btn btn--ghost" onClick={() => handleReplayAction('restart')}>Restart</button>
+          </div>
         </div>
       </div>
 
-      <div className="grid-2">
+      <div className="grid-2" style={{ marginTop: '20px' }}>
         {/* AI Configuration */}
         <div className="card">
           <div className="section-head"><h2>AI Configuration</h2></div>

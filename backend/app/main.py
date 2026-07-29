@@ -5,12 +5,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from app.api import health, events, agents, chat, websocket
+from app.api import health, events, agents, chat, websocket, ecommerce, replay, assessment, incidents
+
+from contextlib import asynccontextmanager
+from app.database.connection import init_db
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
 
 app = FastAPI(
     title="Agentic SOC Copilot",
     version="1.0.0",
     description="AI-powered Security Operations Center for Banking — FinSpark'26",
+    lifespan=lifespan,
 )
 
 # CORS
@@ -28,6 +37,10 @@ app.include_router(events.router)
 app.include_router(agents.router)
 app.include_router(chat.router)
 app.include_router(websocket.router)
+app.include_router(ecommerce.router)
+app.include_router(replay.router)
+app.include_router(assessment.router)
+app.include_router(incidents.router)
 
 @app.get("/", tags=["Root"])
 async def root():

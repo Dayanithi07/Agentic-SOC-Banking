@@ -9,6 +9,7 @@ const NAV: NavItem[] = [
   { icon: '🤖', label: 'AI Agents',      id: 'agents'   },
   { icon: '📊', label: 'Analytics',      id: 'analytics'},
   { icon: '📋', label: 'Investigations', id: 'investigations' },
+  { icon: '🛡️', label: 'Vulnerabilities',id: 'vulnerabilities'},
 ];
 const BOTTOM: NavItem[] = [
   { icon: '⚙️', label: 'Settings', id: 'settings' },

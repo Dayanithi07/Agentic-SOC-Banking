@@ -1,6 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from app.models.event import make_event
-import asyncio, json
+import asyncio
 
 router = APIRouter()
 
@@ -8,13 +7,13 @@ _connections: list[WebSocket] = []
 
 @router.websocket("/ws/telemetry")
 async def telemetry_stream(ws: WebSocket):
-    """WebSocket endpoint — streams a new security event every 8 seconds."""
+    """WebSocket endpoint — streams security events to the frontend."""
     await ws.accept()
     _connections.append(ws)
     try:
+        # Keep the connection open
         while True:
-            await asyncio.sleep(8)
-            event = make_event()
-            await ws.send_text(json.dumps(event.model_dump()))
+            await asyncio.sleep(1)
     except (WebSocketDisconnect, Exception):
-        _connections.remove(ws)
+        if ws in _connections:
+            _connections.remove(ws)
